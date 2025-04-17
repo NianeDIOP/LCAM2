@@ -1,0 +1,506 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex">
+  <div class="sidebar">
+    <div class="p-3"><h4 class="mb-3">Semestre 1</h4></div>
+    <div class="list-group list-group-flush" id="sidebarTabs" role="tablist">
+      <a class="list-group-item list-group-item-action active" data-bs-toggle="tab" href="#overview" role="tab">📊 Vue d'ensemble</a>
+      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#moyennes" role="tab">📈 Analyse Moyennes</a>
+      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#disciplines" role="tab">📋 Analyse Disciplines</a>
+      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#reports" role="tab">📑 Rapports</a>
+      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#import" role="tab">📤 Importation</a>
+    </div>
+  </div>
+  <div class="content-area flex-grow-1 p-3">
+    <div class="tab-content">
+    <!-- Vue d'ensemble -->
+    <div class="tab-pane fade show active" id="overview" role="tabpanel">
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card bg-white shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <h1 class="text-primary mb-0">{{ stats.total_eleves }}</h1>
+                        <p class="text-muted">Élèves évalués</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-white shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <h1 class="text-info mb-0">{{ stats.moyenne_generale }}</h1>
+                        <p class="text-muted">Moyenne générale</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-white shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <h1 class="text-success mb-0">{{ stats.eleves_moyenne }}</h1>
+                        <p class="text-muted">Élèves ≥ 10</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-white shadow-sm h-100">
+                    <div class="card-body text-center">
+                        <h1 class="text-warning mb-0">{{ stats.taux_reussite }}%</h1>
+                        <p class="text-muted">Taux de réussite</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Performance par niveau</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Niveau</th>
+                                        <th>Nombre d'élèves</th>
+                                        <th>Moyenne générale</th>
+                                        <th>Élèves ≥ 10</th>
+                                        <th>Taux de réussite (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if niveau_stats %}
+                                        {% for ns in niveau_stats %}
+                                    <tr>
+                                        <td>{{ ns.niveau }}</td>
+                                        <td>{{ ns.nb_eleves }}</td>
+                                        <td>{{ ns.moyenne }}</td>
+                                        <td>{{ ns.nb_moyenne }}</td>
+                                        <td>{{ ns.taux_reussite }}</td>
+                                    </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center">Aucune donnée disponible</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Moyennes par niveau</h5>
+                    </div>
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <div style="height: 250px; width: 100%;">
+                            <canvas id="moyennesNiveauChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Taux de réussite par niveau</h5>
+                    </div>
+                    <div class="card-body d-flex align-items-center justify-content-center">
+                        <div style="height: 250px; width: 100%;">
+                            <canvas id="tauxReussiteChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analyse Moyennes -->
+    <div class="tab-pane fade" id="moyennes" role="tabpanel" aria-labelledby="moyennes-tab">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Filtrer les données</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="niveau" class="form-label">Niveau</label>
+                                <select class="form-select" id="niveau" name="niveau_id">
+                                    <option value="">Tous les niveaux</option>
+                                    {% for niveau in niveaux %}
+                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="classe" class="form-label">Classe</label>
+                                <select class="form-select" id="classe" name="classe_id">
+                                    <option value="">Toutes les classes</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-primary">
+                    <p class="mb-0">Veuillez sélectionner un niveau et une classe pour afficher les statistiques.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analyse Disciplines -->
+    <div class="tab-pane fade" id="disciplines" role="tabpanel" aria-labelledby="disciplines-tab">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Filtrer les données</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label for="niveauDiscipline" class="form-label">Niveau</label>
+                                <select class="form-select" id="niveauDiscipline" name="niveau_id">
+                                    <option value="">Tous les niveaux</option>
+                                    {% for niveau in niveaux %}
+                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="classeDiscipline" class="form-label">Classe</label>
+                                <select class="form-select" id="classeDiscipline" name="classe_id">
+                                    <option value="">Toutes les classes</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="discipline" class="form-label">Discipline</label>
+                                <select class="form-select" id="discipline" name="discipline_id">
+                                    <option value="">Toutes les disciplines</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-primary">
+                    <p class="mb-0">Veuillez sélectionner un niveau, une classe et une discipline pour afficher les statistiques.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rapports -->
+    <div class="tab-pane fade" id="reports" role="tabpanel" aria-labelledby="reports-tab">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">Sélectionner un type de rapport</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
+                                        <h5>Rapport de classe</h5>
+                                        <p class="small text-muted">Statistiques complètes pour une classe spécifique</p>
+                                        <button class="btn btn-primary btn-sm">Sélectionner</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-book fa-3x text-success mb-3"></i>
+                                        <h5>Rapport par discipline</h5>
+                                        <p class="small text-muted">Analyse détaillée d'une discipline particulière</p>
+                                        <button class="btn btn-success btn-sm">Sélectionner</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
+                                        <h5>Tableau d'honneur</h5>
+                                        <p class="small text-muted">Liste des meilleurs élèves par classe ou niveau</p>
+                                        <button class="btn btn-warning btn-sm">Sélectionner</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <div class="card h-100 shadow-sm">
+                                    <div class="card-body text-center">
+                                        <i class="fas fa-chart-pie fa-3x text-info mb-3"></i>
+                                        <h5>Rapport statistique global</h5>
+                                        <p class="small text-muted">Statistiques générales pour l'établissement</p>
+                                        <button class="btn btn-info btn-sm">Sélectionner</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-primary">
+                    <p class="mb-0">Veuillez sélectionner un type de rapport pour continuer.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Importation -->
+    <form method="POST" action="{{ url_for('semestre1.import_data') }}" enctype="multipart/form-data">
+    <div class="tab-pane fade" id="import" role="tabpanel" aria-labelledby="import-tab">
+        <!-- Étape 1 : Choix Niveau/Classe -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="niveau_id" class="form-label">Niveau</label>
+                <select id="niveau_id" name="niveau_id" class="form-select" required>
+                    <option value="">Sélectionner un niveau</option>
+                    {% for niv in niveaux %}
+                    <option value="{{ niv.id }}">{{ niv.libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label for="classe_id" class="form-label">Classe</label>
+                <select id="classe_id" name="classe_id" class="form-select" required>
+                    <option value="">Sélectionner une classe</option>
+                    {% for cl in classes %}
+                    <option value="{{ cl.id }}">{{ cl.libelle }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <!-- Étape 2 : Choix fichier -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <label for="file" class="form-label">Fichier Excel (.xlsx)</label>
+                <input type="file" id="file" name="file" class="form-control" accept=".xlsx" required>
+            </div>
+        </div>
+        <div class="d-grid">
+            <button class="btn btn-primary" type="submit">Importer</button>
+        </div>
+    </form>
+        <!-- Historique des imports -->
+        <div id="import-history" class="row mt-5">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">Historique des imports</div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0">
+                            <thead>
+                                <tr><th>Niveau</th><th>Classe</th><th>Action</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for imp in imports %}
+                                <tr>
+                                    <td>{{ imp.niveau }}</td>
+                                    <td>{{ imp.classe }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('semestre1.delete_import') }}">
+                                            <input type="hidden" name="niveau_id" value="{{ imp.niveau_id }}">
+                                            <input type="hidden" name="classe_id" value="{{ imp.classe_id }}">
+                                            <button class="btn btn-sm btn-danger">Supprimer</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr><td colspan="3" class="text-center">Aucun import enregistré</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>  <!-- end of import-history -->
+    </div>  <!-- end of import tab-pane -->
+    </div>  <!-- end of tab-content -->
+  </div>
+</div>  <!-- end of d-flex -->
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialiser les graphiques vides
+        const ctx1 = document.getElementById('moyennesNiveauChart').getContext('2d');
+        const moyennesChart = new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['6ème', '5ème', '4ème', '3ème'],
+                datasets: [{
+                    label: 'Moyenne générale',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: '#3498db'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 20
+                    }
+                }
+            }
+        });
+
+        const ctx2 = document.getElementById('tauxReussiteChart').getContext('2d');
+        const tauxChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: ['6ème', '5ème', '4ème', '3ème'],
+                datasets: [{
+                    label: 'Taux de réussite (%)',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: '#2ecc71'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Dynamically load classes on niveau change
+        const niveauSelect = document.getElementById('niveauImport');
+        const classeSelect = document.getElementById('classeImport');
+        niveauSelect.addEventListener('change', function() {
+            const nid = this.value;
+            if (!nid) {
+                classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
+                return;
+            }
+            classeSelect.innerHTML = '<option>Chargement...</option>';
+            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
+                .then(res => res.json())
+                .then(data => {
+                    classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
+                    data.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = c.libelle;
+                        classeSelect.appendChild(opt);
+                    });
+                });
+        });
+
+        // ANALYSE MOYENNES
+        const niveauSel = document.getElementById('niveau');
+        const classeSel = document.getElementById('classe');
+        const moyennesAlert = document.querySelector('#moyennes .alert');
+        function loadClassesForMoy() {
+            const nid = niveauSel.value;
+            classeSel.innerHTML = '<option>Chargement...</option>';
+            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
+                .then(r=>r.json()).then(data=>{
+                    classeSel.innerHTML = '<option selected>Toutes les classes</option>';
+                    data.forEach(c=>{
+                        let o = document.createElement('option'); o.value = c.id; o.text = c.libelle; classeSel.add(o);
+                    });
+                });
+        }
+        niveauSel.addEventListener('change', loadClassesForMoy);
+        classeSel.addEventListener('change', function() {
+            const cid = this.value;
+            if (!cid) return;
+            fetch(`{{ url_for('semestre1.stats_moyennes') }}?classe_id=${cid}`)
+                .then(r=>r.json()).then(s=>{
+                    moyennesAlert.className = 'alert alert-info';
+                    moyennesAlert.innerHTML = `
+                        <strong>Élèves évalués:</strong> ${s.total_eleves}<br>
+                        <strong>Moyenne générale:</strong> ${s.moyenne_generale}<br>
+                        <strong>Élèves ≥ 10:</strong> ${s.eleves_moyenne}<br>
+                        <strong>Taux de réussite:</strong> ${s.taux_reussite}%
+                    `;
+                });
+        });
+
+        // ANALYSE DISCIPLINES
+        const niveauDisc = document.getElementById('niveauDiscipline');
+        const classeDisc = document.getElementById('classeDiscipline');
+        const disciplineSel = document.getElementById('discipline');
+        const discAlert = document.querySelector('#disciplines .alert');
+        function loadClassesForDisc() {
+            const nid = niveauDisc.value;
+            classeDisc.innerHTML = '<option>Chargement...</option>';
+            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
+                .then(r=>r.json()).then(data=>{
+                    classeDisc.innerHTML = '<option selected>Toutes les classes</option>';
+                    data.forEach(c=>{ let o=document.createElement('option'); o.value=c.id; o.text=c.libelle; classeDisc.add(o); });
+                });
+        }
+        niveauDisc.addEventListener('change', loadClassesForDisc);
+        classeDisc.addEventListener('change', function() {
+            const cid = this.value;
+            disciplineSel.innerHTML = '<option>Chargement...</option>';
+            fetch(`{{ url_for('semestre1.get_disciplines', classe_id=0) }}`.replace('0', cid))
+                .then(r=>r.json()).then(data=>{
+                    disciplineSel.innerHTML = '<option selected>Toutes les disciplines</option>';
+                    data.forEach(d=>{ let o=document.createElement('option'); o.value=d.id; o.text=d.libelle; disciplineSel.add(o); });
+                });
+        });
+        disciplineSel.addEventListener('change', function() {
+            const cid = classeDisc.value;
+            const did = this.value;
+            if (!cid||!did) return;
+            fetch(`{{ url_for('semestre1.stats_discipline') }}?classe_id=${cid}&discipline_id=${did}`)
+                .then(r=>r.json()).then(s=>{
+                    discAlert.className = 'alert alert-info';
+                    discAlert.innerHTML = `
+                        <strong>Élèves évalués:</strong> ${s.nb_eleves}<br>
+                        <strong>Moyenne disciplinaire:</strong> ${s.moyenne_discipline}<br>
+                        <strong>Élèves ≥ 10:</strong> ${s.nb_moyenne}<br>
+                        <strong>Taux de réussite:</strong> ${s.taux_reussite}%<br>
+                        <strong>Min:</strong> ${s.min}, <strong>Max:</strong> ${s.max}
+                    `;
+                });
+        });
+
+        // If arriving with '#import-history', switch to Import tab via click then scroll
+        if (window.location.hash === '#import-history') {
+            var importTabBtn = document.getElementById('import-tab');
+            if (importTabBtn) {
+                importTabBtn.click();
+                setTimeout(function() {
+                    var hist = document.getElementById('import-history');
+                    if (hist) hist.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 300);
+            }
+        }
+     });
+ </script>
+{% endblock %}

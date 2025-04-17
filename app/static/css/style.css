@@ -1,0 +1,92 @@
+/* Style principal */
+body {
+    background-color: #f5f5f5;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* En-tête et navigation */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* Sidebar styling */
+.sidebar {
+    width: 250px;
+    position: fixed;
+    top: 56px; /* height of navbar */
+    left: 0;
+    height: calc(100vh - 56px);
+    background-color: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+    overflow-y: auto;
+}
+
+/* Content area adjustment */
+.content-area {
+    margin-left: 250px;
+    padding: 1rem;
+}
+
+/* Cartes */
+.card {
+    transition: transform 0.3s ease;
+    margin-bottom: 1rem;
+    border: none;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    font-weight: bold;
+    border-bottom: none;
+}
+
+/* Boutons */
+.btn {
+    border-radius: 4px;
+    padding: 0.5rem 1.5rem;
+    font-weight: 500;
+}
+
+/* Tableaux de données */
+.table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+/* Conteneurs */
+.container {
+    max-width: 1200px;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+}
+
+/* Utilitaires */
+.shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075)!important;
+}
+
+.shadow {
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+}
+
+.rounded {
+    border-radius: 8px !important;
+}

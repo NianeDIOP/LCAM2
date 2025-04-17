@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center bg-secondary text-white p-3 rounded shadow">
+            <div>
+                <h1 class="h3 mb-0">Éditer une année scolaire</h1>
+                <p class="mb-0">Modification des informations de l'année scolaire</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin.index') }}" class="btn btn-sm btn-light">Retour aux paramètres</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Modifier l'année scolaire</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin.edit_annee', id=annee.id) }}" method="post">
+                    <div class="mb-3">
+                        <label for="libelle" class="form-label">Libellé*</label>
+                        <input type="text" class="form-control" id="libelle" name="libelle" value="{{ annee.libelle }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="date_debut" class="form-label">Date de début</label>
+                        <input type="date" class="form-control" id="date_debut" name="date_debut" value="{{ annee.date_debut }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="date_fin" class="form-label">Date de fin</label>
+                        <input type="date" class="form-control" id="date_fin" name="date_fin" value="{{ annee.date_fin }}">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="etat" name="etat" value="actif" {% if annee.etat == 'actif' %}checked{% endif %}>
+                        <label class="form-check-label" for="etat">
+                            Définir comme année active
+                        </label>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin.index') }}" class="btn btn-secondary">Annuler</a>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

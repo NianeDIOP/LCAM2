@@ -1,0 +1,34 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environment
+venv/
+env/
+
+# Flask instance folder
+instance/
+lcams.db
+
+# Backups and uploads
+backups/
+app/static/uploads/
+
+# VSCode settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and reports
+*.log
+*.tmp
+
+# Coverage
+htmlcov/
+.coverage

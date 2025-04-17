@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center bg-secondary text-white p-3 rounded shadow">
+            <div>
+                <h1 class="h3 mb-0">Éditer une classe</h1>
+                <p class="mb-0">Modification des informations de la classe</p>
+            </div>
+            <div>
+                <a href="{{ url_for('admin.index') }}" class="btn btn-sm btn-light">Retour aux paramètres</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6 mx-auto">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Modifier la classe</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin.edit_classe', id=classe.id) }}" method="post">
+                    <div class="mb-3">
+                        <label for="niveau_id" class="form-label">Niveau</label>
+                        <input type="text" class="form-control" value="{{ classe.niveau.libelle }}" disabled>
+                        <div class="form-text">Le niveau ne peut pas être modifié. Vous devez supprimer la classe et en créer une nouvelle pour changer de niveau.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="libelle" class="form-label">Libellé*</label>
+                        <input type="text" class="form-control" id="libelle" name="libelle" value="{{ classe.libelle }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="effectif" class="form-label">Effectif estimé</label>
+                        <input type="number" class="form-control" id="effectif" name="effectif" value="{{ classe.effectif }}" min="0">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="etat" name="etat" value="actif" {% if classe.etat == 'actif' %}checked{% endif %}>
+                        <label class="form-check-label" for="etat">
+                            Actif
+                        </label>
+                    </div>
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{{ url_for('admin.index') }}" class="btn btn-secondary">Annuler</a>
+                        <button type="submit" class="btn btn-primary">Enregistrer</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12 text-center mb-4">
+        <div class="bg-primary text-white p-4 rounded shadow">
+            <h1>Bienvenue dans {{ app_name }}</h1>
+            <p class="lead">Système de gestion des notes et analyses de performances scolaires</p>
+            <a href="{{ url_for('semestre1.index') }}" class="btn btn-light mt-2">Commencer l'analyse</a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
+                <h3>Module Semestre 1</h3>
+                <p>Importez et analysez les résultats du premier semestre. Visualisez les performances et générez des rapports.</p>
+                <a href="{{ url_for('semestre1.index') }}" class="btn btn-primary">Accéder</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
+                <h3>Module Semestre 2</h3>
+                <p>Gérez les résultats du second semestre. Comparez les performances avec le premier semestre.</p>
+                <a href="{{ url_for('semestre2.index') }}" class="btn btn-success">Accéder</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
+                <h3>Module Général</h3>
+                <p>Analysez les tendances annuelles, comparez les semestres et prenez des décisions éclairées.</p>
+                <a href="#" class="btn btn-danger">Accéder</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-secondary text-white">
+                <h3 class="card-title">Statistiques générales</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-primary">{{ stats.total_eleves }}</h4>
+                            <p>Élèves</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-secondary">{{ stats.total_classes }}</h4>
+                            <p>Classes</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-success">{{ stats.taux_reussite }}%</h4>
+                            <p>Taux de réussite</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h4 class="text-info">{{ request.args.get('annee_scolaire', '') or '' }}</h4>
+                            <p>Année scolaire</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
