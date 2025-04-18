@@ -201,7 +201,7 @@
   .card-header {
     background-color: white;
     border-bottom: 1px solid var(--gray-200);
-    padding: 1rem 1.25rem;
+    padding: 0.75rem 1rem;
     font-weight: 600;
   }
   
@@ -209,6 +209,7 @@
     margin: 0;
     color: var(--primary);
     font-weight: 600;
+    font-size: 1rem;
   }
   
   /* Feature cards pour la page d'accueil */
@@ -335,9 +336,9 @@
   
   /* Page header */
   .page-header {
-    padding: 1rem 0;
+    padding: 0.75rem 0;
+    margin-bottom: 1.25rem;
     border-bottom: 1px solid var(--gray-200);
-    margin-bottom: 2rem;
   }
   
   .page-header .page-title {
@@ -351,9 +352,10 @@
     background-color: white;
     border-radius: var(--radius);
     box-shadow: var(--shadow-sm);
-    padding: 1.25rem;
+    padding: 0.85rem;
     text-align: center;
     transition: var(--transition);
+    margin-bottom: 1rem;
   }
   
   .stat-card:hover {
@@ -362,20 +364,20 @@
   }
   
   .stat-card .icon {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
   }
   
   .stat-card .value {
-    font-size: 1.75rem;
+    font-size: 1.4rem;
     font-weight: 600;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
     color: var(--primary);
   }
   
   .stat-card .label {
     color: var(--gray-600);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
   
   /* Responsive */
@@ -439,4 +441,104 @@
   }
   .theme-admin .page-header .page-title {
     color: var(--dark);
+  }
+
+  /* Styles d'optimisation d'espace */
+
+  /* Réduction de la taille des titres de page */
+  .page-header {
+    padding: 0.75rem 0;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .page-header p {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+    color: var(--gray-600);
+  }
+
+  /* Optimisation des cartes statistiques */
+  .stat-card {
+    padding: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .stat-card .icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .stat-card .value {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .stat-card .label {
+    font-size: 0.8rem;
+  }
+
+  /* Tables plus compactes */
+  .table {
+    margin-bottom: 0;
+    font-size: 0.85rem;
+  }
+
+  .table th, .table td {
+    padding: 0.5rem 0.75rem;
+    vertical-align: middle;
+  }
+
+  /* En-têtes de table plus compacts */
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .card-header .card-title {
+    font-size: 1rem;
+    margin-bottom: 0;
+  }
+
+  /* Espacement entre les rangées plus serré */
+  .row {
+    margin-bottom: 1rem;
+  }
+
+  /* Taille des boutons ajustée */
+  .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  /* Ajustement des marges dans la zone de contenu */
+  .content-area {
+    padding: 1rem;
+  }
+
+  /* Optimiser l'espacement dans les formulaires */
+  .form-label {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .form-control, .form-select {
+    padding: 0.375rem 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .form-text {
+    font-size: 0.75rem;
+  }
+
+  /* Onglets plus compacts */
+  .nav-tabs .nav-link {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
   }

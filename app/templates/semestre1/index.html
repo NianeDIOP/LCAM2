@@ -32,10 +32,15 @@
 
 {% block main_content %}
 {%- if active_tab == 'overview' -%}
-    <div class="page-header mb-4">
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title mb-1">Vue d'ensemble - Semestre 1</h1>
-            <p class="mb-0">Aperçu des performances scolaires pour l'année {{ annee_scolaire }}</p>
+            <h1 class="page-title">Vue d'ensemble</h1>
+            <p>{{ annee_scolaire }}</p>
+        </div>
+        <div>
+            <select class="form-select form-select-sm" id="annee-selector">
+                <option selected>{{ annee_scolaire }}</option>
+            </select>
         </div>
     </div>
 
@@ -122,149 +127,18 @@
         </div>
     </div>
 {%- elif active_tab == 'moyennes' -%}
-    <div class="page-header mb-4">
-        <div>
-            <h1 class="page-title mb-1">Analyse des Moyennes</h1>
-            <p class="mb-0">Analysez les moyennes par niveau, classe et sexe</p>
-        </div>
-    </div>
-
-    <!-- Filtre -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="card-title"><i class="fas fa-filter me-2"></i>Filtrer les données</h5>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label for="niveau" class="form-label">Niveau</label>
-                    <select class="form-select" id="niveau" name="niveau_id">
-                        <option value="">Tous les niveaux</option>
-                        {% for niveau in niveaux %}
-                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="classe" class="form-label">Classe</label>
-                    <select class="form-select" id="classe" name="classe_id" disabled>
-                        <option value="">Sélectionner un niveau d'abord</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="sexe" class="form-label">Sexe</label>
-                    <select class="form-select" id="sexe" name="sexe">
-                        <option value="">Tous</option>
-                        <option value="M">Masculin</option>
-                        <option value="F">Féminin</option>
-                    </select>
-                </div>
-                <div class="col-12 text-end">
-                    <button type="button" class="btn btn-primary" id="btnFiltrerMoyennes">
-                        <i class="fas fa-search me-2"></i>Filtrer
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Zone des résultats de filtrage -->
-    <div id="moyennesStats" class="mb-4">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            Veuillez sélectionner un niveau et une classe pour afficher les statistiques
-        </div>
-    </div>
-
-    <!-- Visualisations -->
-    <div class="row">
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-chart-pie me-2"></i>Synthèse Générale</h5>
-                </div>
-                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
-                    <div class="icon text-primary mb-3">
-                        <i class="fas fa-chart-pie fa-3x"></i>
-                    </div>
-                    <p>Sélectionnez des filtres pour afficher la synthèse des moyennes</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-users me-2"></i>Répartition par Groupe</h5>
-                </div>
-                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
-                    <div class="icon text-info mb-3">
-                        <i class="fas fa-users fa-3x"></i>
-                    </div>
-                    <p>Sélectionnez des filtres pour afficher la répartition par groupe</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-chart-line me-2"></i>Répartition par Intervalle</h5>
-                </div>
-                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
-                    <div class="icon text-success mb-3">
-                        <i class="fas fa-chart-line fa-3x"></i>
-                    </div>
-                    <p>Sélectionnez des filtres pour afficher la répartition par intervalle</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Liste des élèves -->
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title"><i class="fas fa-list me-2"></i>Liste des Élèves</h5>
-            <div>
-                <button type="button" class="btn btn-sm btn-outline-secondary me-2">
-                    <i class="fas fa-print me-1"></i> Imprimer
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success">
-                    <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                </button>
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>N°</th>
-                            <th>Nom</th>
-                            <th>Prénom</th>
-                            <th>Classe</th>
-                            <th>Sexe</th>
-                            <th>Moyenne</th>
-                            <th>Rang</th>
-                            <th>Appréciation</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="9" class="text-center py-4">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Aucune donnée disponible. Veuillez appliquer des filtres.
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+    {# Include the standalone Analyse des moyennes template with sidebar #}
+    {% include 'semestre1/moyennes_analysis.html' %}
 {%- elif active_tab == 'disciplines' -%}
-    <div class="page-header mb-4">
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title mb-1">Analyse par Discipline</h1>
-            <p class="mb-0">Étudiez les performances par matière</p>
+            <h1 class="page-title">Analyse par discipline</h1>
+            <p>Performance par matière</p>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-chart-bar me-1"></i> Graphiques
+            </button>
         </div>
     </div>
 
@@ -383,10 +257,15 @@
         </div>
     </div>
 {%- elif active_tab == 'reports' -%}
-    <div class="page-header mb-4">
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title mb-1">Rapports</h1>
-            <p class="mb-0">Générez des rapports détaillés</p>
+            <h1 class="page-title">Rapports</h1>
+            <p>Bulletins et récapitulatifs</p>
+        </div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-print me-1"></i> Imprimer
+            </button>
         </div>
     </div>
 
@@ -455,10 +334,15 @@
         Veuillez sélectionner un type de rapport pour continuer
     </div>
 {%- elif active_tab == 'import' -%}
-    <div class="page-header mb-4">
+    <div class="page-header d-flex justify-content-between align-items-center">
         <div>
-            <h1 class="page-title mb-1">Importation des données</h1>
-            <p class="mb-0">Importez les données du semestre 1</p>
+            <h1 class="page-title">Importation</h1>
+            <p>Données du semestre 1</p>
+        </div>
+        <div>
+            <a href="#" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importHelpModal">
+                <i class="fas fa-question-circle me-1"></i> Aide
+            </a>
         </div>
     </div>
 
@@ -578,7 +462,7 @@
                                 </tr>
                             {% endfor %}
                         {% else %}
-                            <tr>
+                            <tr></tr>
                                 <td colspan="3" class="text-center py-4">
                                     <i class="fas fa-info-circle me-2"></i>
                                     Aucun import enregistré

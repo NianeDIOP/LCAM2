@@ -129,8 +129,29 @@ def edit_annee(id):
     if request.method == 'POST':
         try:
             annee.libelle = request.form.get('libelle')
-            annee.date_debut = request.form.get('date_debut') or None
-            annee.date_fin = request.form.get('date_fin') or None
+            
+            # Convertir les chaînes de date en objets Python date
+            date_debut_str = request.form.get('date_debut')
+            date_fin_str = request.form.get('date_fin')
+            
+            # Convertir date_debut si elle n'est pas vide
+            if date_debut_str and date_debut_str.strip():
+                try:
+                    annee.date_debut = datetime.strptime(date_debut_str, '%Y-%m-%d').date()
+                except ValueError:
+                    annee.date_debut = None
+            else:
+                annee.date_debut = None
+                
+            # Convertir date_fin si elle n'est pas vide
+            if date_fin_str and date_fin_str.strip():
+                try:
+                    annee.date_fin = datetime.strptime(date_fin_str, '%Y-%m-%d').date()
+                except ValueError:
+                    annee.date_fin = None
+            else:
+                annee.date_fin = None
+            
             etat = 'actif' if request.form.get('etat') == 'actif' else 'inactif'
             
             # Si l'année devient active, désactiver les autres

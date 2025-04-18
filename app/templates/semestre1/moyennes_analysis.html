@@ -1,0 +1,100 @@
+<!-- Define API endpoints for JS -->
+<script>
+  window.apiEndpoints = {
+    getClasses: "{{ url_for('semestre1.get_classes', niveau_id=0) }}",
+    getDisciplines: "{{ url_for('semestre1.get_disciplines', classe_id=0) }}",
+    statsMoyennes: "{{ url_for('semestre1.stats_moyennes') }}",
+    statsDiscipline: "{{ url_for('semestre1.stats_discipline') }}"
+  };
+</script>
+
+<div class="moyennes-analysis">
+  <!-- Filtres en en-tête compact -->
+  <div class="card mb-3">
+    <div class="card-body py-2">
+      <div class="row g-2 align-items-end">
+        <div class="col-sm-6 col-md-4 col-lg-2">
+          <label class="form-label">Niveau</label>
+          <select class="form-select form-select-sm" id="niveau" name="niveau_id">
+            <option value="">Tous niveaux</option>
+            {% for niv in niveaux %}
+            <option value="{{ niv.id }}">{{ niv.libelle }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-2">
+          <label class="form-label">Classe</label>
+          <select class="form-select form-select-sm" id="classe" name="classe_id" disabled>
+            <option>Sélectionner niveau</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-2">
+          <label class="form-label">Sexe</label>
+          <select class="form-select form-select-sm" id="sexe" name="sexe">
+            <option value="">Tous</option>
+            <option value="M">Masculin</option>
+            <option value="F">Féminin</option>
+          </select>
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-2">
+          <label class="form-label">Note min</label>
+          <input type="number" step="0.1" class="form-control form-control-sm" id="note_min" name="note_min" min="0" max="20" placeholder="0">
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-2">
+          <label class="form-label">Note max</label>
+          <input type="number" step="0.1" class="form-control form-control-sm" id="note_max" name="note_max" min="0" max="20" placeholder="20">
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-2 text-end">
+          <button class="btn btn-primary btn-sm" id="btnFiltrerMoyennes">
+            <i class="fas fa-search me-1"></i>Filtrer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cartes de synthèse compactes (dynamiques) -->
+  <div id="moyennesStats" class="row g-2 mb-3">
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card">
+        <div class="icon text-primary"><i class="fas fa-users"></i></div>
+        <div class="value">{{ stats.total_eleves }}</div>
+        <div class="label">Effectif total</div>
+        <small class="text-muted">Hommes: {{ stats.count_hommes }} ({{ stats.taux_hommes }}%)</small><br>
+        <small class="text-muted">Femmes: {{ stats.count_femmes }} ({{ stats.taux_femmes }}%)</small>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card">
+        <div class="icon text-success"><i class="fas fa-user-check"></i></div>
+        <div class="value">{{ stats.eleves_moyenne }}</div>
+        <div class="label">Élèves ≥ 10</div>
+        <small class="text-muted">Hommes: {{ stats.reussite_hommes }} ({{ stats.taux_reussite_hommes }}%)</small><br>
+        <small class="text-muted">Femmes: {{ stats.reussite_femmes }} ({{ stats.taux_reussite_femmes }}%)</small>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card stat-card">
+        <div class="icon text-info"><i class="fas fa-calculator"></i></div>
+        <div class="value">{{ stats.moyenne_generale }}</div>
+        <div class="label">Moyenne générale</div>
+        <small class="text-muted">Min: {{ stats.min }} / Max: {{ stats.max }}</small>
+      </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+      <div class="card h-100">
+        <div class="card-body p-2 d-flex flex-column">
+          <canvas id="mentionsChart" class="flex-fill"></canvas>
+          <hr class="my-2">
+          <canvas id="performanceChart" class="flex-fill"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>  <!-- /#moyennesStats -->
+
+</div>
+<script>
+// Après chargement, afficher dynamiquement les cartes et graphiques
+createMoyennesCharts();
+filtrerMoyennes();
+</script>

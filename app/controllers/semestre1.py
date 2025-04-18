@@ -12,7 +12,7 @@ semestre1_bp = Blueprint('semestre1', __name__)
 @semestre1_bp.route('/')
 def index():
     # Determine active tab from query parameter (overview, moyennes, disciplines, reports, import)
-    active_tab = request.args.get('tab', 'overview')
+    active_tab = request.args.get('tab', 'moyennes')
     # Récupérer l'année scolaire active
     annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
@@ -32,7 +32,23 @@ def index():
     taux_reussite = 0
     if total_eleves > 0:
         taux_reussite = (eleves_moyenne / total_eleves) * 100
-    
+    # Calculer extrêmes (min & max) de toutes les moyennes et répartition par sexe
+    base_q = db.session.query(MoyenneGeneraleS1).join(Eleve, MoyenneGeneraleS1.eleve_ien==Eleve.ien)
+    base_q = base_q.filter(MoyenneGeneraleS1.annee_scolaire == annee_active)
+    toutes_moyennes = [m.moyenne for m in base_q.with_entities(MoyenneGeneraleS1.moyenne).all() if m[0] is not None]
+    global_min = round(min(toutes_moyennes),2) if toutes_moyennes else 0
+    global_max = round(max(toutes_moyennes),2) if toutes_moyennes else 0
+    global_count_m = base_q.filter(Eleve.sexe=='M').count()
+    global_count_f = base_q.filter(Eleve.sexe=='F').count()
+    global_taux_m = round(global_count_m/total_eleves*100,2) if total_eleves>0 else 0
+    global_taux_f = round(global_count_f/total_eleves*100,2) if total_eleves>0 else 0
+    base_reussite_q = base_q.filter(MoyenneGeneraleS1.moyenne>=10)
+    reussite_count = eleves_moyenne
+    global_reussite_m = base_reussite_q.filter(Eleve.sexe=='M').count()
+    global_reussite_f = base_reussite_q.filter(Eleve.sexe=='F').count()
+    global_taux_reussite_m = round(global_reussite_m/global_count_m*100,2) if global_count_m>0 else 0
+    global_taux_reussite_f = round(global_reussite_f/global_count_f*100,2) if global_count_f>0 else 0
+
     # Récupérer les niveaux
     niveaux = Niveau.query.filter_by(etat='actif').all()
     # Historique des imports (niveau-classe pour semestre 1)
@@ -86,9 +102,18 @@ def index():
                           annee_scolaire=annee_active,
                           stats={
                               'total_eleves': total_eleves,
-                              'moyenne_generale': round(moyenne_generale, 2),
+                              'count_hommes': global_count_m,
+                              'count_femmes': global_count_f,
+                              'taux_hommes': global_taux_m,
+                              'taux_femmes': global_taux_f,
                               'eleves_moyenne': eleves_moyenne,
-                              'taux_reussite': round(taux_reussite, 2)
+                              'reussite_hommes': global_reussite_m,
+                              'reussite_femmes': global_reussite_f,
+                              'taux_reussite_hommes': global_taux_reussite_m,
+                              'taux_reussite_femmes': global_taux_reussite_f,
+                              'moyenne_generale': round(moyenne_generale, 2),
+                              'min': global_min,
+                              'max': global_max
                           },
                           niveau_stats=niveau_stats,
                           niveaux=niveaux,
@@ -119,26 +144,73 @@ def get_disciplines(classe_id):
 
 @semestre1_bp.route('/api/stats/moyennes')
 def stats_moyennes():
+    # Récupérer filtres
     niveau_id = request.args.get('niveau_id')
     classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = float(request.args.get('note_min', 0))
+    note_max = float(request.args.get('note_max', 20))
     # Récupérer l'année scolaire active
     annee = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee.libelle if annee else '2024-2025'
-    # Filtrer élèves de la classe
-    query = db.session.query(MoyenneGeneraleS1).join(Eleve, MoyenneGeneraleS1.eleve_ien==Eleve.ien)
+    # Construire la requête avec filtres
+    q = db.session.query(MoyenneGeneraleS1).join(Eleve, MoyenneGeneraleS1.eleve_ien==Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id==Classe.id).join(Niveau, Classe.niveau_id==Niveau.id)
+    # Appliquer filtres niveau et classe
+    if niveau_id:
+        q = q.filter(Niveau.id==niveau_id)
     if classe_id:
-        query = query.filter(Eleve.classe_id==classe_id)
-    query = query.filter(MoyenneGeneraleS1.annee_scolaire==annee_active)
-    moys = query.with_entities(MoyenneGeneraleS1.moyenne)
-    total = query.count()
-    reussite = query.filter(MoyenneGeneraleS1.moyenne>=10).count()
+        q = q.filter(Classe.id==classe_id)
+    # Filtrer par sexe si fourni
+    if sexe in ('M','F'):
+        q = q.filter(Eleve.sexe==sexe)
+    # Filtrer par intervalle de notes
+    q = q.filter(MoyenneGeneraleS1.annee_scolaire==annee_active,
+                 MoyenneGeneraleS1.moyenne>=note_min,
+                 MoyenneGeneraleS1.moyenne<=note_max)
+    # Statistiques globales
+    total = q.count()
+    moys = q.with_entities(MoyenneGeneraleS1.moyenne)
     moyenne = round(sum([m.moyenne or 0 for m in moys]) / total,2) if total>0 else 0
-    taux = round((reussite/total*100),2) if total>0 else 0
+    reussite_count = q.filter(MoyenneGeneraleS1.moyenne>=10).count()
+    taux_reussite = round((reussite_count/total*100),2) if total>0 else 0
+    # Répartition par sexe (les jointures Eleve sont déjà faites)
+    count_m = q.filter(Eleve.sexe=='M').count()
+    count_f = q.filter(Eleve.sexe=='F').count()
+    taux_m = round((count_m/total*100),2) if total>0 else 0
+    taux_f = round((count_f/total*100),2) if total>0 else 0
+    # Extrêmes
+    all_moy = [m[0] for m in q.with_entities(MoyenneGeneraleS1.moyenne).all() if m[0] is not None]
+    minv = round(min(all_moy),2) if all_moy else 0
+    maxv = round(max(all_moy),2) if all_moy else 0
+    # Catégories de mentions
+    mentions = {
+        'Félicitations': q.filter(MoyenneGeneraleS1.moyenne >= 17).count(),
+        'Encouragements': q.filter(MoyenneGeneraleS1.moyenne >= 15, MoyenneGeneraleS1.moyenne < 17).count(),
+        'Honneur': q.filter(MoyenneGeneraleS1.moyenne >= 12, MoyenneGeneraleS1.moyenne < 15).count(),
+        'Passable': q.filter(MoyenneGeneraleS1.moyenne >= 10, MoyenneGeneraleS1.moyenne < 12).count(),
+        'Insuffisant': q.filter(MoyenneGeneraleS1.moyenne < 10).count()
+    }
+    # Catégories de performance / risque
+    performance = {
+        'Excellent': mentions['Félicitations'],
+        'Satisfait': q.filter(MoyenneGeneraleS1.moyenne >= 12, MoyenneGeneraleS1.moyenne < 17).count(),
+        'Peut mieux faire': q.filter(MoyenneGeneraleS1.moyenne >= 10, MoyenneGeneraleS1.moyenne < 12).count(),
+        'Risque redoublement': q.filter(MoyenneGeneraleS1.moyenne >= 7, MoyenneGeneraleS1.moyenne < 10).count(),
+        'Risque exclusion': q.filter(MoyenneGeneraleS1.moyenne < 7).count()
+    }
     return jsonify({
         'total_eleves': total,
         'moyenne_generale': moyenne,
-        'eleves_moyenne': reussite,
-        'taux_reussite': taux
+        'eleves_moyenne': reussite_count,
+        'taux_reussite': taux_reussite,
+        'count_hommes': count_m,
+        'count_femmes': count_f,
+        'taux_hommes': taux_m,
+        'taux_femmes': taux_f,
+        'min': minv,
+        'max': maxv
+        , 'mention_counts': mentions, 'performance_counts': performance
     })
 
 @semestre1_bp.route('/api/stats/discipline')
