@@ -11,6 +11,8 @@ semestre1_bp = Blueprint('semestre1', __name__)
 
 @semestre1_bp.route('/')
 def index():
+    # Determine active tab from query parameter (overview, moyennes, disciplines, reports, import)
+    active_tab = request.args.get('tab', 'overview')
     # Récupérer l'année scolaire active
     annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
@@ -76,12 +78,11 @@ def index():
                 'taux_reussite': round(taux, 2)
             })
     
-    # Tab à afficher
-    tab = request.args.get('tab', 'overview')
     return render_template('semestre1/index.html', 
                           title='Module Semestre 1', 
                           app_name=current_app.config['APP_NAME'], 
                           app_version=current_app.config['APP_VERSION'],
+                          active_tab=active_tab,
                           annee_scolaire=annee_active,
                           stats={
                               'total_eleves': total_eleves,
@@ -92,8 +93,7 @@ def index():
                           niveau_stats=niveau_stats,
                           niveaux=niveaux,
                           imports=imports,
-                          classes=classes_active,
-                          active_tab=tab)
+                          classes=classes_active)
 
 @semestre1_bp.route('/api/classes/<int:niveau_id>')
 def get_classes(niveau_id):
@@ -320,7 +320,7 @@ def import_data():
                 except Exception:
                     pass
                 
-                return redirect(url_for('semestre1.index'))
+                return redirect(url_for('semestre1.index', tab='import'))
             except Exception as e:
                 flash(f"Erreur lors du traitement du fichier: {str(e)}", 'danger')
                 return redirect(request.url)
@@ -329,7 +329,7 @@ def import_data():
             return redirect(request.url)
     
     # Redirect GET to main index (import tab available there)
-    return redirect(url_for('semestre1.index'))
+    return redirect(url_for('semestre1.index', tab='import'))
 
 def importer_donnees_excel(filepath, niveau_id, classe_id, annee_scolaire):
     """Importe les données d'un fichier Excel"""
@@ -687,7 +687,7 @@ def delete_import():
         ).delete(synchronize_session=False)
         db.session.commit()
         flash(f"Import supprimé pour Niveau id={niveau_id}, Classe id={classe_id}", 'success')
-    # Redirect back to Import tab and history section
+    # Redirect back to the Import tab history section
     return redirect(url_for('semestre1.index', tab='import') + '#import-history')
 
 @semestre1_bp.route('/import/delete-class', methods=['POST'])

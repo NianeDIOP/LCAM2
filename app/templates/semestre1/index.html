@@ -1,506 +1,1013 @@
-{% extends 'base.html' %}
+{% extends 'with_sidebar.html' %}
+{% block body_class %}theme-semestre1{% endblock %}
 
-{% block content %}
-<div class="d-flex">
-  <div class="sidebar">
-    <div class="p-3"><h4 class="mb-3">Semestre 1</h4></div>
-    <div class="list-group list-group-flush" id="sidebarTabs" role="tablist">
-      <a class="list-group-item list-group-item-action active" data-bs-toggle="tab" href="#overview" role="tab">📊 Vue d'ensemble</a>
-      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#moyennes" role="tab">📈 Analyse Moyennes</a>
-      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#disciplines" role="tab">📋 Analyse Disciplines</a>
-      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#reports" role="tab">📑 Rapports</a>
-      <a class="list-group-item list-group-item-action" data-bs-toggle="tab" href="#import" role="tab">📤 Importation</a>
+{% set title = 'Semestre 1' %}
+
+{% block sidebar_content %}
+    <a href="{{ url_for('semestre1.index', tab='overview') }}" class="list-group-item {% if active_tab == 'overview' %}active{% endif %}">
+        <i class="fas fa-chart-pie"></i> Vue d'ensemble
+    </a>
+    <a href="{{ url_for('semestre1.index', tab='moyennes') }}" class="list-group-item {% if active_tab == 'moyennes' %}active{% endif %}">
+        <i class="fas fa-chart-line"></i> Analyse des moyennes
+    </a>
+    <a href="{{ url_for('semestre1.index', tab='disciplines') }}" class="list-group-item {% if active_tab == 'disciplines' %}active{% endif %}">
+        <i class="fas fa-book"></i> Analyse par discipline
+    </a>
+    <a href="{{ url_for('semestre1.index', tab='reports') }}" class="list-group-item {% if active_tab == 'reports' %}active{% endif %}">
+        <i class="fas fa-file-alt"></i> Rapports
+    </a>
+    <a href="{{ url_for('semestre1.index', tab='import') }}" class="list-group-item {% if active_tab == 'import' %}active{% endif %}">
+        <i class="fas fa-upload"></i> Importation
+    </a>
+    <div class="mt-4 px-3">
+        <hr class="border-white opacity-25">
+        <a href="{{ url_for('main.index') }}" class="list-group-item">
+            <i class="fas fa-home"></i> Accueil
+        </a>
+        <a href="{{ url_for('admin.index') }}" class="list-group-item">
+            <i class="fas fa-cog"></i> Paramètres
+        </a>
     </div>
-  </div>
-  <div class="content-area flex-grow-1 p-3">
-    <div class="tab-content">
-    <!-- Vue d'ensemble -->
-    <div class="tab-pane fade show active" id="overview" role="tabpanel">
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-white shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h1 class="text-primary mb-0">{{ stats.total_eleves }}</h1>
-                        <p class="text-muted">Élèves évalués</p>
-                    </div>
+{% endblock %}
+
+{% block main_content %}
+{%- if active_tab == 'overview' -%}
+    <div class="page-header mb-4">
+        <div>
+            <h1 class="page-title mb-1">Vue d'ensemble - Semestre 1</h1>
+            <p class="mb-0">Aperçu des performances scolaires pour l'année {{ annee_scolaire }}</p>
+        </div>
+    </div>
+
+    <!-- Statistiques générales -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="icon text-primary mb-3">
+                    <i class="fas fa-user-graduate fa-2x"></i>
                 </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-white shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h1 class="text-info mb-0">{{ stats.moyenne_generale }}</h1>
-                        <p class="text-muted">Moyenne générale</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-white shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h1 class="text-success mb-0">{{ stats.eleves_moyenne }}</h1>
-                        <p class="text-muted">Élèves ≥ 10</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card bg-white shadow-sm h-100">
-                    <div class="card-body text-center">
-                        <h1 class="text-warning mb-0">{{ stats.taux_reussite }}%</h1>
-                        <p class="text-muted">Taux de réussite</p>
-                    </div>
-                </div>
+                <div class="value text-primary">{{ stats.total_eleves }}</div>
+                <div class="label">Élèves évalués</div>
             </div>
         </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="icon text-info mb-3">
+                    <i class="fas fa-calculator fa-2x"></i>
+                </div>
+                <div class="value text-info">{{ stats.moyenne_generale }}</div>
+                <div class="label">Moyenne générale</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="icon text-success mb-3">
+                    <i class="fas fa-check-circle fa-2x"></i>
+                </div>
+                <div class="value text-success">{{ stats.eleves_moyenne }}</div>
+                <div class="label">Élèves ≥ 10</div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="stat-card">
+                <div class="icon text-warning mb-3">
+                    <i class="fas fa-award fa-2x"></i>
+                </div>
+                <div class="value text-warning">{{ stats.taux_reussite }}%</div>
+                <div class="label">Taux de réussite</div>
+            </div>
+        </div>
+    </div>
 
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Performance par niveau</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Niveau</th>
-                                        <th>Nombre d'élèves</th>
-                                        <th>Moyenne générale</th>
-                                        <th>Élèves ≥ 10</th>
-                                        <th>Taux de réussite (%)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% if niveau_stats %}
-                                        {% for ns in niveau_stats %}
-                                    <tr>
-                                        <td>{{ ns.niveau }}</td>
-                                        <td>{{ ns.nb_eleves }}</td>
-                                        <td>{{ ns.moyenne }}</td>
-                                        <td>{{ ns.nb_moyenne }}</td>
-                                        <td>{{ ns.taux_reussite }}</td>
-                                    </tr>
-                                        {% endfor %}
-                                    {% else %}
+    <!-- Performance par niveau -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-layer-group me-2"></i>Performance par niveau</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Niveau</th>
+                                    <th>Nombre d'élèves</th>
+                                    <th>Moyenne générale</th>
+                                    <th>Élèves ≥ 10</th>
+                                    <th>Taux de réussite (%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if niveau_stats %}
+                                    {% for ns in niveau_stats %}
+                                        <tr>
+                                            <td>{{ ns.niveau }}</td>
+                                            <td>{{ ns.nb_eleves }}</td>
+                                            <td>{{ ns.moyenne }}</td>
+                                            <td>{{ ns.nb_moyenne }}</td>
+                                            <td>{{ ns.taux_reussite }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% else %}
                                     <tr>
                                         <td colspan="5" class="text-center">Aucune donnée disponible</td>
                                     </tr>
-                                    {% endif %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Moyennes par niveau</h5>
-                    </div>
-                    <div class="card-body d-flex align-items-center justify-content-center">
-                        <div style="height: 250px; width: 100%;">
-                            <canvas id="moyennesNiveauChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Taux de réussite par niveau</h5>
-                    </div>
-                    <div class="card-body d-flex align-items-center justify-content-center">
-                        <div style="height: 250px; width: 100%;">
-                            <canvas id="tauxReussiteChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Analyse Moyennes -->
-    <div class="tab-pane fade" id="moyennes" role="tabpanel" aria-labelledby="moyennes-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Filtrer les données</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="niveau" class="form-label">Niveau</label>
-                                <select class="form-select" id="niveau" name="niveau_id">
-                                    <option value="">Tous les niveaux</option>
-                                    {% for niveau in niveaux %}
-                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="classe" class="form-label">Classe</label>
-                                <select class="form-select" id="classe" name="classe_id">
-                                    <option value="">Toutes les classes</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-primary">
-                    <p class="mb-0">Veuillez sélectionner un niveau et une classe pour afficher les statistiques.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Analyse Disciplines -->
-    <div class="tab-pane fade" id="disciplines" role="tabpanel" aria-labelledby="disciplines-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Filtrer les données</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-4">
-                                <label for="niveauDiscipline" class="form-label">Niveau</label>
-                                <select class="form-select" id="niveauDiscipline" name="niveau_id">
-                                    <option value="">Tous les niveaux</option>
-                                    {% for niveau in niveaux %}
-                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="classeDiscipline" class="form-label">Classe</label>
-                                <select class="form-select" id="classeDiscipline" name="classe_id">
-                                    <option value="">Toutes les classes</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4">
-                                <label for="discipline" class="form-label">Discipline</label>
-                                <select class="form-select" id="discipline" name="discipline_id">
-                                    <option value="">Toutes les disciplines</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-primary">
-                    <p class="mb-0">Veuillez sélectionner un niveau, une classe et une discipline pour afficher les statistiques.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Rapports -->
-    <div class="tab-pane fade" id="reports" role="tabpanel" aria-labelledby="reports-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Sélectionner un type de rapport</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-3 mb-3">
-                                <div class="card h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
-                                        <h5>Rapport de classe</h5>
-                                        <p class="small text-muted">Statistiques complètes pour une classe spécifique</p>
-                                        <button class="btn btn-primary btn-sm">Sélectionner</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-book fa-3x text-success mb-3"></i>
-                                        <h5>Rapport par discipline</h5>
-                                        <p class="small text-muted">Analyse détaillée d'une discipline particulière</p>
-                                        <button class="btn btn-success btn-sm">Sélectionner</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-trophy fa-3x text-warning mb-3"></i>
-                                        <h5>Tableau d'honneur</h5>
-                                        <p class="small text-muted">Liste des meilleurs élèves par classe ou niveau</p>
-                                        <button class="btn btn-warning btn-sm">Sélectionner</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3 mb-3">
-                                <div class="card h-100 shadow-sm">
-                                    <div class="card-body text-center">
-                                        <i class="fas fa-chart-pie fa-3x text-info mb-3"></i>
-                                        <h5>Rapport statistique global</h5>
-                                        <p class="small text-muted">Statistiques générales pour l'établissement</p>
-                                        <button class="btn btn-info btn-sm">Sélectionner</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="alert alert-primary">
-                    <p class="mb-0">Veuillez sélectionner un type de rapport pour continuer.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Importation -->
-    <form method="POST" action="{{ url_for('semestre1.import_data') }}" enctype="multipart/form-data">
-    <div class="tab-pane fade" id="import" role="tabpanel" aria-labelledby="import-tab">
-        <!-- Étape 1 : Choix Niveau/Classe -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <label for="niveau_id" class="form-label">Niveau</label>
-                <select id="niveau_id" name="niveau_id" class="form-select" required>
-                    <option value="">Sélectionner un niveau</option>
-                    {% for niv in niveaux %}
-                    <option value="{{ niv.id }}">{{ niv.libelle }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label for="classe_id" class="form-label">Classe</label>
-                <select id="classe_id" name="classe_id" class="form-select" required>
-                    <option value="">Sélectionner une classe</option>
-                    {% for cl in classes %}
-                    <option value="{{ cl.id }}">{{ cl.libelle }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-        </div>
-        <!-- Étape 2 : Choix fichier -->
-        <div class="row mb-4">
-            <div class="col-12">
-                <label for="file" class="form-label">Fichier Excel (.xlsx)</label>
-                <input type="file" id="file" name="file" class="form-control" accept=".xlsx" required>
-            </div>
-        </div>
-        <div class="d-grid">
-            <button class="btn btn-primary" type="submit">Importer</button>
-        </div>
-    </form>
-        <!-- Historique des imports -->
-        <div id="import-history" class="row mt-5">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">Historique des imports</div>
-                    <div class="card-body p-0">
-                        <table class="table mb-0">
-                            <thead>
-                                <tr><th>Niveau</th><th>Classe</th><th>Action</th></tr>
-                            </thead>
-                            <tbody>
-                                {% for imp in imports %}
-                                <tr>
-                                    <td>{{ imp.niveau }}</td>
-                                    <td>{{ imp.classe }}</td>
-                                    <td>
-                                        <form method="POST" action="{{ url_for('semestre1.delete_import') }}">
-                                            <input type="hidden" name="niveau_id" value="{{ imp.niveau_id }}">
-                                            <input type="hidden" name="classe_id" value="{{ imp.classe_id }}">
-                                            <button class="btn btn-sm btn-danger">Supprimer</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr><td colspan="3" class="text-center">Aucun import enregistré</td></tr>
-                                {% endfor %}
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
-        </div>  <!-- end of import-history -->
-    </div>  <!-- end of import tab-pane -->
-    </div>  <!-- end of tab-content -->
-  </div>
-</div>  <!-- end of d-flex -->
+        </div>
+    </div>
+{%- elif active_tab == 'moyennes' -%}
+    <div class="page-header mb-4">
+        <div>
+            <h1 class="page-title mb-1">Analyse des Moyennes</h1>
+            <p class="mb-0">Analysez les moyennes par niveau, classe et sexe</p>
+        </div>
+    </div>
+
+    <!-- Filtre -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title"><i class="fas fa-filter me-2"></i>Filtrer les données</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="niveau" class="form-label">Niveau</label>
+                    <select class="form-select" id="niveau" name="niveau_id">
+                        <option value="">Tous les niveaux</option>
+                        {% for niveau in niveaux %}
+                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="classe" class="form-label">Classe</label>
+                    <select class="form-select" id="classe" name="classe_id" disabled>
+                        <option value="">Sélectionner un niveau d'abord</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="sexe" class="form-label">Sexe</label>
+                    <select class="form-select" id="sexe" name="sexe">
+                        <option value="">Tous</option>
+                        <option value="M">Masculin</option>
+                        <option value="F">Féminin</option>
+                    </select>
+                </div>
+                <div class="col-12 text-end">
+                    <button type="button" class="btn btn-primary" id="btnFiltrerMoyennes">
+                        <i class="fas fa-search me-2"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone des résultats de filtrage -->
+    <div id="moyennesStats" class="mb-4">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Veuillez sélectionner un niveau et une classe pour afficher les statistiques
+        </div>
+    </div>
+
+    <!-- Visualisations -->
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-chart-pie me-2"></i>Synthèse Générale</h5>
+                </div>
+                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                    <div class="icon text-primary mb-3">
+                        <i class="fas fa-chart-pie fa-3x"></i>
+                    </div>
+                    <p>Sélectionnez des filtres pour afficher la synthèse des moyennes</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-users me-2"></i>Répartition par Groupe</h5>
+                </div>
+                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                    <div class="icon text-info mb-3">
+                        <i class="fas fa-users fa-3x"></i>
+                    </div>
+                    <p>Sélectionnez des filtres pour afficher la répartition par groupe</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-chart-line me-2"></i>Répartition par Intervalle</h5>
+                </div>
+                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                    <div class="icon text-success mb-3">
+                        <i class="fas fa-chart-line fa-3x"></i>
+                    </div>
+                    <p>Sélectionnez des filtres pour afficher la répartition par intervalle</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Liste des élèves -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title"><i class="fas fa-list me-2"></i>Liste des Élèves</h5>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2">
+                    <i class="fas fa-print me-1"></i> Imprimer
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-file-excel me-1"></i> Exporter Excel
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>N°</th>
+                            <th>Nom</th>
+                            <th>Prénom</th>
+                            <th>Classe</th>
+                            <th>Sexe</th>
+                            <th>Moyenne</th>
+                            <th>Rang</th>
+                            <th>Appréciation</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="9" class="text-center py-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Aucune donnée disponible. Veuillez appliquer des filtres.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{%- elif active_tab == 'disciplines' -%}
+    <div class="page-header mb-4">
+        <div>
+            <h1 class="page-title mb-1">Analyse par Discipline</h1>
+            <p class="mb-0">Étudiez les performances par matière</p>
+        </div>
+    </div>
+
+    <!-- Filtre -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title"><i class="fas fa-filter me-2"></i>Filtrer les données</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label for="niveauDiscipline" class="form-label">Niveau</label>
+                    <select class="form-select" id="niveauDiscipline" name="niveau_id">
+                        <option value="">Tous les niveaux</option>
+                        {% for niveau in niveaux %}
+                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="classeDiscipline" class="form-label">Classe</label>
+                    <select class="form-select" id="classeDiscipline" name="classe_id" disabled>
+                        <option value="">Sélectionner un niveau d'abord</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="discipline" class="form-label">Discipline</label>
+                    <select class="form-select" id="discipline" name="discipline_id" disabled>
+                        <option value="">Sélectionner une classe d'abord</option>
+                    </select>
+                </div>
+                <div class="col-12 text-end">
+                    <button type="button" class="btn btn-primary" id="btnFiltrerDisciplines">
+                        <i class="fas fa-search me-2"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Zone des résultats de filtrage -->
+    <div id="disciplinesStats" class="mb-4">
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>
+            Veuillez sélectionner un niveau, une classe et une discipline pour afficher les statistiques
+        </div>
+    </div>
+
+    <!-- Visualisations -->
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-book-open me-2"></i>Performance par Discipline</h5>
+                </div>
+                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                    <div class="icon text-primary mb-3">
+                        <i class="fas fa-book-open fa-3x"></i>
+                    </div>
+                    <p>Sélectionnez des filtres pour afficher les performances par discipline</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-balance-scale me-2"></i>Comparaison entre Disciplines</h5>
+                </div>
+                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
+                    <div class="icon text-info mb-3">
+                        <i class="fas fa-balance-scale fa-3x"></i>
+                    </div>
+                    <p>Sélectionnez des filtres pour afficher la comparaison entre disciplines</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tableau des résultats -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title"><i class="fas fa-table me-2"></i>Résultats par Discipline</h5>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary me-2">
+                    <i class="fas fa-print me-1"></i> Imprimer
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-file-excel me-1"></i> Exporter Excel
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Discipline</th>
+                            <th>Moyenne Générale</th>
+                            <th>Minimum</th>
+                            <th>Maximum</th>
+                            <th>≥ 10/20</th>
+                            <th>< 10/20</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-info-circle me-2"></i>
+                                Sélectionnez des filtres pour afficher les résultats par discipline
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{%- elif active_tab == 'reports' -%}
+    <div class="page-header mb-4">
+        <div>
+            <h1 class="page-title mb-1">Rapports</h1>
+            <p class="mb-0">Générez des rapports détaillés</p>
+        </div>
+    </div>
+
+    <!-- Types de rapports -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title"><i class="fas fa-file-alt me-2"></i>Sélectionner un type de rapport</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 border shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <div class="icon text-primary mb-3">
+                                <i class="fas fa-chalkboard-teacher fa-3x"></i>
+                            </div>
+                            <h5>Rapport de classe</h5>
+                            <p class="small text-muted mb-3">Statistiques complètes pour une classe spécifique</p>
+                            <button type="button" class="btn btn-primary btn-sm px-4">Sélectionner</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 border shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <div class="icon text-success mb-3">
+                                <i class="fas fa-book fa-3x"></i>
+                            </div>
+                            <h5>Rapport par discipline</h5>
+                            <p class="small text-muted mb-3">Analyse détaillée d'une discipline particulière</p>
+                            <button type="button" class="btn btn-success btn-sm px-4">Sélectionner</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 border shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <div class="icon text-warning mb-3">
+                                <i class="fas fa-trophy fa-3x"></i>
+                            </div>
+                            <h5>Tableau d'honneur</h5>
+                            <p class="small text-muted mb-3">Liste des meilleurs élèves par classe ou niveau</p>
+                            <button type="button" class="btn btn-warning btn-sm px-4">Sélectionner</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card h-100 border shadow-sm">
+                        <div class="card-body text-center p-4">
+                            <div class="icon text-info mb-3">
+                                <i class="fas fa-chart-pie fa-3x"></i>
+                            </div>
+                            <h5>Rapport statistique global</h5>
+                            <p class="small text-muted mb-3">Statistiques générales pour l'établissement</p>
+                            <button type="button" class="btn btn-info btn-sm px-4">Sélectionner</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information -->
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        Veuillez sélectionner un type de rapport pour continuer
+    </div>
+{%- elif active_tab == 'import' -%}
+    <div class="page-header mb-4">
+        <div>
+            <h1 class="page-title mb-1">Importation des données</h1>
+            <p class="mb-0">Importez les données du semestre 1</p>
+        </div>
+    </div>
+
+    <!-- Étapes d'importation -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="import-steps d-flex justify-content-between position-relative mb-5">
+                <!-- Ligne de connexion -->
+                <div class="import-line position-absolute" style="top: 25px; left: 50px; right: 50px; height: 2px; background-color: #e9ecef; z-index: 0;"></div>
+                
+                <!-- Étapes -->
+                <div class="step-item text-center position-relative" style="z-index: 1;">
+                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                         style="width: 50px; height: 50px; border-radius: 50%; background-color: var(--primary); color: white;">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="step-label">Sélection</div>
+                </div>
+                
+                <div class="step-item text-center position-relative" style="z-index: 1;">
+                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
+                        2
+                    </div>
+                    <div class="step-label">Import Excel</div>
+                </div>
+                
+                <div class="step-item text-center position-relative" style="z-index: 1;">
+                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
+                        3
+                    </div>
+                    <div class="step-label">Visualisation</div>
+                </div>
+                
+                <div class="step-item text-center position-relative" style="z-index: 1;">
+                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
+                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
+                        4
+                    </div>
+                    <div class="step-label">Validation</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Formulaire d'importation -->
+    <form method="POST" action="{{ url_for('semestre1.import_data') }}" enctype="multipart/form-data">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="card-title"><i class="fas fa-file-import me-2"></i>Importer des données</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="niveau_id" class="form-label">Niveau</label>
+                        <select id="niveau_id" name="niveau_id" class="form-select" required>
+                            <option value="">Sélectionner un niveau</option>
+                            {% for niv in niveaux %}
+                                <option value="{{ niv.id }}">{{ niv.libelle }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="classe_id" class="form-label">Classe</label>
+                        <select id="classe_id" name="classe_id" class="form-select" required disabled>
+                            <option value="">Sélectionner un niveau d'abord</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="file" class="form-label">Fichier Excel (.xlsx)</label>
+                        <input type="file" id="file" name="file" class="form-control" accept=".xlsx" required>
+                        <div class="form-text">Le fichier doit contenir les feuilles "Moyennes eleves" et "Données détaillées"</div>
+                    </div>
+                    
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-upload me-2"></i>Importer
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- Historique des imports -->
+    <div id="import-history" class="card">
+        <div class="card-header">
+            <h5 class="card-title"><i class="fas fa-history me-2"></i>Historique des imports</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Niveau</th>
+                            <th>Classe</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if imports %}
+                            {% for imp in imports %}
+                                <tr>
+                                    <td>{{ imp.niveau }}</td>
+                                    <td>{{ imp.classe }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('semestre1.delete_import') }}" class="d-inline-block">
+                                            <input type="hidden" name="niveau_id" value="{{ imp.niveau_id }}">
+                                            <input type="hidden" name="classe_id" value="{{ imp.classe_id }}">
+                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirmAction('Êtes-vous sûr de vouloir supprimer cet import ?');">
+                                                <i class="fas fa-trash-alt me-1"></i> Supprimer
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center py-4">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    Aucun import enregistré
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{%- endif -%}
 {% endblock %}
 
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialiser les graphiques vides
-        const ctx1 = document.getElementById('moyennesNiveauChart').getContext('2d');
-        const moyennesChart = new Chart(ctx1, {
-            type: 'bar',
-            data: {
-                labels: ['6ème', '5ème', '4ème', '3ème'],
-                datasets: [{
-                    label: 'Moyenne générale',
-                    data: [0, 0, 0, 0],
-                    backgroundColor: '#3498db'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 20
-                    }
-                }
-            }
-        });
+        // Créer les graphiques
+        createCharts();
+        
+        // Gérer les interactions des filtres
+        setupFilters();
+        
+        // setupTabs removed to allow full page reload for sidebar links
 
-        const ctx2 = document.getElementById('tauxReussiteChart').getContext('2d');
-        const tauxChart = new Chart(ctx2, {
-            type: 'bar',
-            data: {
-                labels: ['6ème', '5ème', '4ème', '3ème'],
-                datasets: [{
-                    label: 'Taux de réussite (%)',
-                    data: [0, 0, 0, 0],
-                    backgroundColor: '#2ecc71'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100
-                    }
-                }
-            }
-        });
-
-        // Dynamically load classes on niveau change
-        const niveauSelect = document.getElementById('niveauImport');
-        const classeSelect = document.getElementById('classeImport');
-        niveauSelect.addEventListener('change', function() {
-            const nid = this.value;
-            if (!nid) {
-                classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
-                return;
-            }
-            classeSelect.innerHTML = '<option>Chargement...</option>';
-            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
-                .then(res => res.json())
-                .then(data => {
-                    classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
-                    data.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = c.libelle;
-                        classeSelect.appendChild(opt);
-                    });
-                });
-        });
-
-        // ANALYSE MOYENNES
-        const niveauSel = document.getElementById('niveau');
-        const classeSel = document.getElementById('classe');
-        const moyennesAlert = document.querySelector('#moyennes .alert');
-        function loadClassesForMoy() {
-            const nid = niveauSel.value;
-            classeSel.innerHTML = '<option>Chargement...</option>';
-            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
-                .then(r=>r.json()).then(data=>{
-                    classeSel.innerHTML = '<option selected>Toutes les classes</option>';
-                    data.forEach(c=>{
-                        let o = document.createElement('option'); o.value = c.id; o.text = c.libelle; classeSel.add(o);
-                    });
-                });
+        // Auto-trigger filters for analysis tabs based on ?tab query param
+        const urlParams = new URLSearchParams(window.location.search);
+        const activeTabParam = urlParams.get('tab') || 'overview';
+        if (activeTabParam === 'moyennes') {
+            document.getElementById('btnFiltrerMoyennes')?.click();
         }
-        niveauSel.addEventListener('change', loadClassesForMoy);
-        classeSel.addEventListener('change', function() {
-            const cid = this.value;
-            if (!cid) return;
-            fetch(`{{ url_for('semestre1.stats_moyennes') }}?classe_id=${cid}`)
-                .then(r=>r.json()).then(s=>{
-                    moyennesAlert.className = 'alert alert-info';
-                    moyennesAlert.innerHTML = `
-                        <strong>Élèves évalués:</strong> ${s.total_eleves}<br>
-                        <strong>Moyenne générale:</strong> ${s.moyenne_generale}<br>
-                        <strong>Élèves ≥ 10:</strong> ${s.eleves_moyenne}<br>
-                        <strong>Taux de réussite:</strong> ${s.taux_reussite}%
-                    `;
-                });
-        });
-
-        // ANALYSE DISCIPLINES
-        const niveauDisc = document.getElementById('niveauDiscipline');
-        const classeDisc = document.getElementById('classeDiscipline');
-        const disciplineSel = document.getElementById('discipline');
-        const discAlert = document.querySelector('#disciplines .alert');
-        function loadClassesForDisc() {
-            const nid = niveauDisc.value;
-            classeDisc.innerHTML = '<option>Chargement...</option>';
-            fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', nid))
-                .then(r=>r.json()).then(data=>{
-                    classeDisc.innerHTML = '<option selected>Toutes les classes</option>';
-                    data.forEach(c=>{ let o=document.createElement('option'); o.value=c.id; o.text=c.libelle; classeDisc.add(o); });
-                });
+        if (activeTabParam === 'disciplines') {
+            document.getElementById('btnFiltrerDisciplines')?.click();
         }
-        niveauDisc.addEventListener('change', loadClassesForDisc);
-        classeDisc.addEventListener('change', function() {
-            const cid = this.value;
-            disciplineSel.innerHTML = '<option>Chargement...</option>';
-            fetch(`{{ url_for('semestre1.get_disciplines', classe_id=0) }}`.replace('0', cid))
-                .then(r=>r.json()).then(data=>{
-                    disciplineSel.innerHTML = '<option selected>Toutes les disciplines</option>';
-                    data.forEach(d=>{ let o=document.createElement('option'); o.value=d.id; o.text=d.libelle; disciplineSel.add(o); });
-                });
-        });
-        disciplineSel.addEventListener('change', function() {
-            const cid = classeDisc.value;
-            const did = this.value;
-            if (!cid||!did) return;
-            fetch(`{{ url_for('semestre1.stats_discipline') }}?classe_id=${cid}&discipline_id=${did}`)
-                .then(r=>r.json()).then(s=>{
-                    discAlert.className = 'alert alert-info';
-                    discAlert.innerHTML = `
-                        <strong>Élèves évalués:</strong> ${s.nb_eleves}<br>
-                        <strong>Moyenne disciplinaire:</strong> ${s.moyenne_discipline}<br>
-                        <strong>Élèves ≥ 10:</strong> ${s.nb_moyenne}<br>
-                        <strong>Taux de réussite:</strong> ${s.taux_reussite}%<br>
-                        <strong>Min:</strong> ${s.min}, <strong>Max:</strong> ${s.max}
-                    `;
-                });
-        });
-
-        // If arriving with '#import-history', switch to Import tab via click then scroll
+        // If landing with #import-history hash, scroll to history
         if (window.location.hash === '#import-history') {
-            var importTabBtn = document.getElementById('import-tab');
-            if (importTabBtn) {
-                importTabBtn.click();
-                setTimeout(function() {
-                    var hist = document.getElementById('import-history');
-                    if (hist) hist.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 300);
+            // Activer l'onglet import
+            const tabLink = document.querySelector('.list-group-item[href*="tab=import"]');
+            if (tabLink) {
+                tabLink.click();
             }
+            
+            // Après un court délai pour laisser le temps à l'onglet de s'afficher, scroller vers l'historique
+            setTimeout(function() {
+                const historyElement = document.getElementById('import-history');
+                if (historyElement) {
+                    historyElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 300);
         }
-     });
- </script>
+    });
+    
+    // Créer les graphiques
+    function createCharts() {
+        // Créer le graphique des moyennes par niveau
+        const moyennesNiveauCtx = document.getElementById('moyennesNiveauChart');
+        if (moyennesNiveauCtx) {
+            // Extraire les données des attributs data (si définis) ou utiliser des valeurs par défaut
+            const labels = moyennesNiveauCtx.getAttribute('data-labels') ? 
+                JSON.parse(moyennesNiveauCtx.getAttribute('data-labels')) : 
+                [{% for ns in niveau_stats %}'{{ ns.niveau }}',{% endfor %}];
+            
+            const values = moyennesNiveauCtx.getAttribute('data-values') ? 
+                JSON.parse(moyennesNiveauCtx.getAttribute('data-values')) : 
+                [{% for ns in niveau_stats %}{{ ns.moyenne }},{% endfor %}];
+            
+            // Créer le graphique
+            new Chart(moyennesNiveauCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Moyenne générale',
+                        data: values,
+                        backgroundColor: 'rgba(94, 53, 177, 0.7)',
+                        borderColor: 'rgba(94, 53, 177, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 20
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Créer le graphique des taux de réussite par niveau
+        const tauxReussiteCtx = document.getElementById('tauxReussiteChart');
+        if (tauxReussiteCtx) {
+            // Extraire les données des attributs data (si définis) ou utiliser des valeurs par défaut
+            const labels = tauxReussiteCtx.getAttribute('data-labels') ? 
+                JSON.parse(tauxReussiteCtx.getAttribute('data-labels')) : 
+                [{% for ns in niveau_stats %}'{{ ns.niveau }}',{% endfor %}];
+            
+            const values = tauxReussiteCtx.getAttribute('data-values') ? 
+                JSON.parse(tauxReussiteCtx.getAttribute('data-values')) : 
+                [{% for ns in niveau_stats %}{{ ns.taux_reussite }},{% endfor %}];
+            
+            // Créer le graphique
+            new Chart(tauxReussiteCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Taux de réussite (%)',
+                        data: values,
+                        backgroundColor: 'rgba(46, 204, 113, 0.7)',
+                        borderColor: 'rgba(46, 204, 113, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // Configurer les filtres
+    function setupFilters() {
+        // Gestion des sélects dépendants niveau/classe
+        setupNiveauClasseSelects('niveau', 'classe');
+        setupNiveauClasseSelects('niveauDiscipline', 'classeDiscipline');
+        setupNiveauClasseSelects('niveau_id', 'classe_id');
+        
+        // Gestion des sélects dépendants classe/discipline
+        setupClasseDisciplineSelects('classeDiscipline', 'discipline');
+        
+        // Gestion du bouton de filtrage des moyennes
+        const btnFiltrerMoyennes = document.getElementById('btnFiltrerMoyennes');
+        if (btnFiltrerMoyennes) {
+            btnFiltrerMoyennes.addEventListener('click', function() {
+                filtrerMoyennes();
+            });
+        }
+        
+        // Gestion du bouton de filtrage des disciplines
+        const btnFiltrerDisciplines = document.getElementById('btnFiltrerDisciplines');
+        if (btnFiltrerDisciplines) {
+            btnFiltrerDisciplines.addEventListener('click', function() {
+                filtrerDisciplines();
+            });
+        }
+    }
+    
+    // Configurer les sélects dépendants niveau/classe
+    function setupNiveauClasseSelects(niveauId, classeId) {
+        const niveauSelect = document.getElementById(niveauId);
+        const classeSelect = document.getElementById(classeId);
+        
+        if (niveauSelect && classeSelect) {
+            niveauSelect.addEventListener('change', function() {
+                const niveauId = this.value;
+                
+                if (!niveauId) {
+                    classeSelect.innerHTML = '<option value="">Sélectionner un niveau d\'abord</option>';
+                    classeSelect.disabled = true;
+                    return;
+                }
+                
+                classeSelect.disabled = true;
+                classeSelect.innerHTML = '<option value="">Chargement...</option>';
+                
+                fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', niveauId))
+                    .then(response => response.json())
+                    .then(data => {
+                        classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
+                        
+                        data.forEach(classe => {
+                            const option = document.createElement('option');
+                            option.value = classe.id;
+                            option.textContent = classe.libelle;
+                            classeSelect.appendChild(option);
+                        });
+                        
+                        classeSelect.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors du chargement des classes:', error);
+                        classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                        classeSelect.disabled = false;
+                    });
+            });
+        }
+    }
+    
+    // Configurer les sélects dépendants classe/discipline
+    function setupClasseDisciplineSelects(classeId, disciplineId) {
+        const classeSelect = document.getElementById(classeId);
+        const disciplineSelect = document.getElementById(disciplineId);
+        
+        if (classeSelect && disciplineSelect) {
+            classeSelect.addEventListener('change', function() {
+                const classeId = this.value;
+                
+                if (!classeId) {
+                    disciplineSelect.innerHTML = '<option value="">Sélectionner une classe d\'abord</option>';
+                    disciplineSelect.disabled = true;
+                    return;
+                }
+                
+                disciplineSelect.disabled = true;
+                disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+                
+                fetch(`{{ url_for('semestre1.get_disciplines', classe_id=0) }}`.replace('0', classeId))
+                    .then(response => response.json())
+                    .then(data => {
+                        disciplineSelect.innerHTML = '<option value="">Sélectionner une discipline</option>';
+                        
+                        data.forEach(discipline => {
+                            const option = document.createElement('option');
+                            option.value = discipline.id;
+                            option.textContent = discipline.libelle;
+                            disciplineSelect.appendChild(option);
+                        });
+                        
+                        disciplineSelect.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('Erreur lors du chargement des disciplines:', error);
+                        disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                        disciplineSelect.disabled = false;
+                    });
+            });
+        }
+    }
+    
+    // Filtrer les moyennes
+    function filtrerMoyennes() {
+        const classeId = document.getElementById('classe').value;
+        const moyennesStatsDiv = document.getElementById('moyennesStats');
+        
+        if (!classeId) {
+            moyennesStatsDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Veuillez sélectionner une classe pour afficher les statistiques
+                </div>
+            `;
+            return;
+        }
+        
+        // Afficher un indicateur de chargement
+        moyennesStatsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>
+                Chargement des données...
+            </div>
+        `;
+        
+        // Appeler l'API pour récupérer les statistiques
+        fetch(`{{ url_for('semestre1.stats_moyennes') }}?classe_id=${classeId}`)
+            .then(response => response.json())
+            .then(data => {
+                // Afficher les statistiques
+                moyennesStatsDiv.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-primary mb-3">
+                                    <i class="fas fa-user-graduate fa-2x"></i>
+                                </div>
+                                <div class="value text-primary">${data.total_eleves}</div>
+                                <div class="label">Élèves évalués</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-info mb-3">
+                                    <i class="fas fa-calculator fa-2x"></i>
+                                </div>
+                                <div class="value text-info">${data.moyenne_generale}</div>
+                                <div class="label">Moyenne générale</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-success mb-3">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                                <div class="value text-success">${data.eleves_moyenne}</div>
+                                <div class="label">Élèves ≥ 10</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-warning mb-3">
+                                    <i class="fas fa-award fa-2x"></i>
+                                </div>
+                                <div class="value text-warning">${data.taux_reussite}%</div>
+                                <div class="label">Taux de réussite</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des statistiques:', error);
+                moyennesStatsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Erreur lors du chargement des données. Veuillez réessayer.
+                    </div>
+                `;
+            });
+    }
+    
+    // Filtrer les disciplines
+    function filtrerDisciplines() {
+        const classeId = document.getElementById('classeDiscipline').value;
+        const disciplineId = document.getElementById('discipline').value;
+        const disciplinesStatsDiv = document.getElementById('disciplinesStats');
+        
+        if (!classeId || !disciplineId) {
+            disciplinesStatsDiv.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Veuillez sélectionner une classe et une discipline pour afficher les statistiques
+                </div>
+            `;
+            return;
+        }
+        
+        // Afficher un indicateur de chargement
+        disciplinesStatsDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin me-2"></i>
+                Chargement des données...
+            </div>
+        `;
+        
+        // Appeler l'API pour récupérer les statistiques
+        fetch(`{{ url_for('semestre1.stats_discipline') }}?classe_id=${classeId}&discipline_id=${disciplineId}`)
+            .then(response => response.json())
+            .then(data => {
+                // Afficher les statistiques
+                disciplinesStatsDiv.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-primary mb-3">
+                                    <i class="fas fa-user-graduate fa-2x"></i>
+                                </div>
+                                <div class="value text-primary">${data.nb_eleves}</div>
+                                <div class="label">Élèves</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-info mb-3">
+                                    <i class="fas fa-calculator fa-2x"></i>
+                                </div>
+                                <div class="value text-info">${data.moyenne_discipline}</div>
+                                <div class="label">Moyenne</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-success mb-3">
+                                    <i class="fas fa-check-circle fa-2x"></i>
+                                </div>
+                                <div class="value text-success">${data.nb_moyenne}</div>
+                                <div class="label">≥ 10</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-warning mb-3">
+                                    <i class="fas fa-award fa-2x"></i>
+                                </div>
+                                <div class="value text-warning">${data.taux_reussite}%</div>
+                                <div class="label">Taux</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-danger mb-3">
+                                    <i class="fas fa-arrow-down fa-2x"></i>
+                                </div>
+                                <div class="value text-danger">${data.min}</div>
+                                <div class="label">Min</div>
+                            </div>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <div class="stat-card">
+                                <div class="icon text-primary mb-3">
+                                    <i class="fas fa-arrow-up fa-2x"></i>
+                                </div>
+                                <div class="value text-primary">${data.max}</div>
+                                <div class="label">Max</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des statistiques:', error);
+                disciplinesStatsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        Erreur lors du chargement des données. Veuillez réessayer.
+                    </div>
+                `;
+            });
+    }
+</script>
 {% endblock %}

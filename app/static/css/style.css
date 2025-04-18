@@ -1,92 +1,442 @@
-/* Style principal */
-body {
-    background-color: #f5f5f5;
+/* Variables de couleurs */
+:root {
+    --primary: #5e35b1;
+    --secondary: #e91e63;
+    --primary-light: #7e57c2;
+    --primary-dark: #4527a0;
+    --secondary-light: #f48fb1;
+    --secondary-dark: #c2185b;
+    --success: #2ecc71;
+    --danger: #e74c3c;
+    --warning: #f39c12;
+    --info: #3498db;
+    --light: #f5f6fa;
+    --dark: #2c3e50;
+    --gray-100: #f8f9fa;
+    --gray-200: #e9ecef;
+    --gray-300: #dee2e6;
+    --gray-400: #ced4da;
+    --gray-500: #adb5bd;
+    --gray-600: #6c757d;
+    --gray-700: #495057;
+    --gray-800: #343a40;
+    --gray-900: #212529;
+    
+    --sidebar-width: 200px;
+    --header-height: 60px;
+    --footer-height: 60px;
+    --gradient-primary: linear-gradient(45deg, var(--primary) 0%, var(--secondary) 100%);
+    --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    --radius: 8px;
+    --transition: all 0.3s ease;
+  }
+  
+  /* Styles globaux */
+  body {
+    background-color: var(--light);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-}
-
-main {
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: var(--gray-800);
+    line-height: 1.5;
+    font-size: 0.9rem; /* reduce default font size */
+    padding-top: var(--header-height); /* avoid content behind navbar */
+  }
+  
+  main {
     flex: 1;
-}
-
-/* En-tête et navigation */
-.navbar {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.navbar-brand {
-    font-weight: bold;
-}
-
-/* Sidebar styling */
-.sidebar {
-    width: 250px;
+  }
+  
+  /* Headings scaling */
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.75rem; }
+  h3 { font-size: 1.25rem; }
+  
+  /* Navbar */
+  .navbar {
+    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+    padding: 0.75rem 1rem;
+    box-shadow: var(--shadow-sm);
     position: fixed;
-    top: 56px; /* height of navbar */
-    left: 0;
-    height: calc(100vh - 56px);
-    background-color: #f8f9fa;
-    border-right: 1px solid #dee2e6;
-    overflow-y: auto;
-}
-
-/* Content area adjustment */
-.content-area {
-    margin-left: 250px;
-    padding: 1rem;
-}
-
-/* Cartes */
-.card {
-    transition: transform 0.3s ease;
-    margin-bottom: 1rem;
-    border: none;
-    border-radius: 8px;
-    overflow: hidden;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-}
-
-.card-header {
-    font-weight: bold;
-    border-bottom: none;
-}
-
-/* Boutons */
-.btn {
-    border-radius: 4px;
-    padding: 0.5rem 1.5rem;
+    top: 0;
+    width: 100%;
+    z-index: 1100;
+  }
+  
+  .navbar-brand {
+    display: flex;
+    align-items: center;
+    color: white !important;
+    font-weight: 600;
+  }
+  
+  .brand-text {
+    font-size: 1.25rem;
+    margin-left: 0.5rem;
+  }
+  
+  .navbar-dark .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.85);
+    padding: 0.5rem 1rem;
+    margin: 0 0.125rem;
+    border-radius: var(--radius);
     font-weight: 500;
-}
-
-/* Tableaux de données */
-.table th {
-    background-color: #f8f9fa;
-    font-weight: bold;
-}
-
-/* Conteneurs */
-.container {
-    max-width: 1200px;
-}
-
-/* Footer */
-footer {
+    transition: var(--transition);
+  }
+  
+  .navbar-dark .navbar-nav .nav-link:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  
+  .navbar-dark .navbar-nav .nav-link.active {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.25);
+  }
+  
+  .navbar-dark .navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.5);
+    padding: 0.25rem 0.5rem;
+  }
+  
+  .navbar-dark .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.9)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+  }
+  
+  /* Sidebar (ne sera utilisée que dans les pages avec sidebar) */
+  .sidebar {
+    width: var(--sidebar-width);
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    height: calc(100vh - var(--header-height) - var(--footer-height));
+    background: linear-gradient(to bottom, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    overflow-y: auto;
+    z-index: 1000;
+    transition: var(--transition);
+    box-shadow: var(--shadow);
+  }
+  
+  .content-area {
+    margin-left: 0; /* Par défaut, pas de margin pour la page d'accueil */
+    padding: 1.5rem;
+    transition: var(--transition);
+    padding-top: 1rem; /* extra top padding */
+    width: 100%;
+  }
+  
+  /* Pour les pages avec sidebar */
+  .has-sidebar .content-area {
+    margin-left: var(--sidebar-width);
+    flex: 1 1 auto;  /* grow to fill remaining space */
+    min-width: 0;    /* allow child elements to shrink properly */
+    width: calc(100% - var(--sidebar-width));
+  }
+  
+  /* Remove container-fluid gutters in content-area */
+  .has-sidebar .content-area .container-fluid {
+    padding-left: 0;
+    padding-right: 0;
+  }
+  
+  /* Sidebar links */
+  .sidebar .list-group-item {
+    background: transparent;
+    color: white;
+    border: none;
+    padding: .75rem 1.25rem;
+    transition: var(--transition);
+  }
+  
+  .sidebar .list-group-item:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+  }
+  
+  .sidebar .list-group-item.active {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+  }
+  
+  /* Page d'accueil */
+  .hero-section {
+    background: linear-gradient(135deg, rgba(94, 53, 177, 0.9) 0%, rgba(233, 30, 99, 0.9) 100%), url('/static/img/bg-pattern.png');
+    background-size: cover;
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 3rem;
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
+  
+  .hero-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+  
+  .hero-text {
+    font-size: 1.1rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.9;
+  }
+  
+  /* Cartes */
+  .card {
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+    transition: var(--transition);
+  }
+  
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+  }
+  
+  .card-header {
+    background-color: white;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 1rem 1.25rem;
+    font-weight: 600;
+  }
+  
+  .card-title {
+    margin: 0;
+    color: var(--primary);
+    font-weight: 600;
+  }
+  
+  /* Feature cards pour la page d'accueil */
+  .feature-card {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    border-radius: var(--radius);
+    background-color: white;
+    box-shadow: var(--shadow-sm);
+    height: 100%;
+    transition: var(--transition);
+  }
+  
+  .feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+  }
+  
+  .feature-card .icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+  
+  .feature-card h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+  
+  .feature-card p {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+  }
+  
+  /* Indicateurs de performance */
+  .indicators-section {
+    background-color: var(--gray-100);
+    padding: 3rem 0;
+    margin: 3rem 0;
+  }
+  
+  .indicators-title {
+    text-align: center;
+    color: var(--primary);
+    font-weight: 600;
+    margin-bottom: 2rem;
+  }
+  
+  .indicator-card {
+    background-color: white;
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: var(--shadow-sm);
+    height: 100%;
+  }
+  
+  .indicator-card .icon {
+    font-size: 2rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+  }
+  
+  .indicator-card h3 {
+    color: var(--primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  
+  .indicator-card p {
+    color: var(--gray-600);
+    margin-bottom: 0;
+  }
+  
+  /* Étapes */
+  .steps-section {
+    background-color: white;
+    padding: 3rem 0;
+  }
+  
+  .step-card {
+    position: relative;
+    padding: 1.5rem;
+    border-radius: var(--radius);
+    background-color: white;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 1.5rem;
+  }
+  
+  .step-number {
+    position: absolute;
+    top: -15px;
+    left: -15px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+  
+  .step-card h3 {
+    color: var(--primary);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-left: 1.5rem;
+  }
+  
+  /* Footer */
+  footer {
+    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+    color: white;
+    padding: 1rem 0;
     margin-top: auto;
-}
+  }
+  
+  /* Page header */
+  .page-header {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--gray-200);
+    margin-bottom: 2rem;
+  }
+  
+  .page-header .page-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    color: var(--primary);
+  }
+  
+  /* Stat cards on overview */
+  .stat-card {
+    background-color: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    padding: 1.25rem;
+    text-align: center;
+    transition: var(--transition);
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow);
+  }
+  
+  .stat-card .icon {
+    font-size: 2rem;
+    margin-bottom: 0.75rem;
+  }
+  
+  .stat-card .value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+  }
+  
+  .stat-card .label {
+    color: var(--gray-600);
+    font-size: 0.9rem;
+  }
+  
+  /* Responsive */
+  @media (max-width: 992px) {
+    .sidebar {
+      transform: translateX(-100%);
+    }
+    
+    .has-sidebar .content-area {
+      margin-left: 0;
+    }
+    
+    .sidebar.show {
+      transform: translateX(0);
+    }
+    
+    .hero-title {
+      font-size: 2rem;
+    }
+    
+    .brand-text {
+      font-size: 1.1rem;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .hero-title {
+      font-size: 1.75rem;
+    }
+    
+    .hero-text {
+      font-size: 1rem;
+    }
+  }
+  
+  @media (max-width: 576px) {
+    .navbar {
+      padding: 0.5rem 1rem;
+    }
+    
+    .brand-text {
+      font-size: 1rem;
+    }
+    
+    .navbar-dark .navbar-nav .nav-link {
+      padding: 0.5rem 0.75rem;
+    }
+  }
 
-/* Utilitaires */
-.shadow-sm {
-    box-shadow: 0 .125rem .25rem rgba(0,0,0,.075)!important;
-}
+  /* Theming: Semestre1 */
+  .theme-semestre1 .sidebar {
+    background: linear-gradient(45deg, var(--info) 0%, var(--secondary-light) 100%);
+  }
+  .theme-semestre1 .page-header .page-title {
+    color: var(--info);
+  }
 
-.shadow {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
-}
-
-.rounded {
-    border-radius: 8px !important;
-}
+  /* Theming: Admin */
+  .theme-admin .sidebar {
+    background: linear-gradient(45deg, var(--dark) 0%, var(--gray-700) 100%);
+  }
+  .theme-admin .page-header .page-title {
+    color: var(--dark);
+  }

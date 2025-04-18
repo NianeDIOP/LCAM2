@@ -1,131 +1,123 @@
-{% extends 'base.html' %}
+{% extends 'with_sidebar.html' %}
+{% block body_class %}theme-admin{% endblock %}
 
-{% block content %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center bg-secondary text-white p-3 rounded shadow">
-            <div>
-                <h1 class="h3 mb-0">⚙️ Paramètres</h1>
-                <p class="mb-0">Configuration et personnalisation de l'application</p>
-            </div>
-            <div>
-                <a href="{{ url_for('main.index') }}" class="btn btn-sm btn-light">Accueil</a>
-                <a href="{{ url_for('semestre1.index') }}" class="btn btn-sm btn-light">Semestre 1</a>
-                <a href="{{ url_for('semestre2.index') }}" class="btn btn-sm btn-light">Semestre 2</a>
-            </div>
-        </div>
+{% set title = 'Paramètres' %}
+
+{% block sidebar_content %}
+    <a href="#etablissement" class="list-group-item active" data-bs-toggle="tab">
+        <i class="fas fa-school me-2"></i> Établissement
+    </a>
+    <a href="#annee" class="list-group-item" data-bs-toggle="tab">
+        <i class="fas fa-calendar-alt me-2"></i> Année scolaire
+    </a>
+    <a href="#niveaux" class="list-group-item" data-bs-toggle="tab">
+        <i class="fas fa-layer-group me-2"></i> Niveaux
+    </a>
+    <a href="#classes" class="list-group-item" data-bs-toggle="tab">
+        <i class="fas fa-chalkboard me-2"></i> Classes
+    </a>
+    <a href="#backup" class="list-group-item" data-bs-toggle="tab">
+        <i class="fas fa-database me-2"></i> Sauvegarde
+    </a>
+    <div class="mt-4 px-3">
+        <hr class="border-white opacity-25">
+        <a href="{{ url_for('main.index') }}" class="list-group-item">
+            <i class="fas fa-home me-2"></i> Accueil
+        </a>
+        <a href="{{ url_for('semestre1.index') }}" class="list-group-item">
+            <i class="fas fa-calendar me-2"></i> Semestre 1
+        </a>
     </div>
-</div>
+{% endblock %}
 
-<div class="row mb-4">
-    <div class="col-12">
-        <ul class="nav nav-tabs" id="parametersTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="etablissement-tab" data-bs-toggle="tab" data-bs-target="#etablissement" type="button" role="tab" aria-controls="etablissement" aria-selected="true">
-                    <i class="fas fa-school me-2"></i>Établissement
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="annee-tab" data-bs-toggle="tab" data-bs-target="#annee" type="button" role="tab" aria-controls="annee" aria-selected="false">
-                    <i class="fas fa-calendar-alt me-2"></i>Année scolaire
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="niveaux-tab" data-bs-toggle="tab" data-bs-target="#niveaux" type="button" role="tab" aria-controls="niveaux" aria-selected="false">
-                    <i class="fas fa-layer-group me-2"></i>Niveaux
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="classes-tab" data-bs-toggle="tab" data-bs-target="#classes" type="button" role="tab" aria-controls="classes" aria-selected="false">
-                    <i class="fas fa-chalkboard me-2"></i>Classes
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="backup-tab" data-bs-toggle="tab" data-bs-target="#backup" type="button" role="tab" aria-controls="backup" aria-selected="false">
-                    <i class="fas fa-database me-2"></i>Sauvegarde
-                </button>
-            </li>
-        </ul>
-    </div>
-</div>
+{% block main_content %}
+    <div class="tab-content">
+        <!-- Établissement -->
+        <div class="tab-pane fade show active" id="etablissement" role="tabpanel">
+            <div class="page-header mb-4">
+                <div>
+                    <h1 class="page-title mb-1">Informations de l'établissement</h1>
+                    <p class="mb-0">Configurer les informations de base de l'établissement</p>
+                </div>
+            </div>
 
-<div class="tab-content" id="parametersTabContent">
-    <!-- Informations de l'établissement -->
-    <div class="tab-pane fade show active" id="etablissement" role="tabpanel" aria-labelledby="etablissement-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Informations de l'établissement</h5>
-                    </div>
-                    <div class="card-body">
-                        <form action="{{ url_for('admin.update_etablissement') }}" method="post">
-                            <div class="row g-3">
-                                <div class="col-md-12">
-                                    <label for="nom_etablissement" class="form-label">Nom de l'établissement*</label>
-                                    <input type="text" class="form-control" id="nom_etablissement" name="nom_etablissement" value="{{ config.nom_etablissement }}" required>
-                                </div>
-                                <div class="col-md-12">
-                                    <label for="adresse" class="form-label">Adresse</label>
-                                    <textarea class="form-control" id="adresse" name="adresse" rows="2">{{ config.adresse }}</textarea>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="telephone" class="form-label">Téléphone</label>
-                                    <input type="text" class="form-control" id="telephone" name="telephone" value="{{ config.telephone }}">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="inspection_academique" class="form-label">Inspection d'académie</label>
-                                    <input type="text" class="form-control" id="inspection_academique" name="inspection_academique" value="{{ config.inspection_academique }}">
-                                </div>
-                                <div class="col-md-12">
-                                    <label for="inspection_education" class="form-label">Inspection de l'éducation et de la formation</label>
-                                    <input type="text" class="form-control" id="inspection_education" name="inspection_education" value="{{ config.inspection_education }}">
-                                </div>
-                                <div class="col-12 d-grid gap-2 d-md-flex justify-content-md-end">
-                                    <button type="submit" class="btn btn-primary">Enregistrer</button>
-                                </div>
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title"><i class="fas fa-building me-2"></i>Détails de l'établissement</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('admin.update_etablissement') }}" method="post">
+                        <div class="row g-3">
+                            <div class="col-md-12">
+                                <label for="nom_etablissement" class="form-label">Nom de l'établissement*</label>
+                                <input type="text" class="form-control" id="nom_etablissement" name="nom_etablissement" value="{{ config.nom_etablissement }}" required>
                             </div>
-                        </form>
-                    </div>
+                            <div class="col-md-12">
+                                <label for="adresse" class="form-label">Adresse</label>
+                                <textarea class="form-control" id="adresse" name="adresse" rows="2">{{ config.adresse }}</textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="telephone" class="form-label">Téléphone</label>
+                                <input type="text" class="form-control" id="telephone" name="telephone" value="{{ config.telephone }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="inspection_academique" class="form-label">Inspection d'académie</label>
+                                <input type="text" class="form-control" id="inspection_academique" name="inspection_academique" value="{{ config.inspection_academique }}">
+                            </div>
+                            <div class="col-md-12">
+                                <label for="inspection_education" class="form-label">Inspection de l'éducation et de la formation</label>
+                                <input type="text" class="form-control" id="inspection_education" name="inspection_education" value="{{ config.inspection_education }}">
+                            </div>
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save me-2"></i>Enregistrer
+                                </button>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Gestion de l'année scolaire -->
-    <div class="tab-pane fade" id="annee" role="tabpanel" aria-labelledby="annee-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Gestion des années scolaires</h5>
-                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAnneeModal">
-                            <i class="fas fa-plus me-1"></i> Ajouter
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Libellé</th>
-                                        <th>État</th>
-                                        <th>Date début</th>
-                                        <th>Date fin</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for annee in annees %}
+        <!-- Année scolaire -->
+        <div class="tab-pane fade" id="annee" role="tabpanel">
+            <div class="page-header mb-4">
+                <div>
+                    <h1 class="page-title mb-1">Gestion des années scolaires</h1>
+                    <p class="mb-0">Ajouter, modifier ou supprimer des années scolaires</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title"><i class="fas fa-calendar-alt me-2"></i>Années scolaires</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAnneeModal">
+                        <i class="fas fa-plus me-1"></i> Ajouter
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Libellé</th>
+                                    <th>État</th>
+                                    <th>Date début</th>
+                                    <th>Date fin</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for annee in annees %}
                                     <tr>
                                         <td>{{ annee.id }}</td>
                                         <td>{{ annee.libelle }}</td>
                                         <td>
                                             {% if annee.etat == 'actif' %}
-                                            <span class="badge bg-success">Actif</span>
+                                                <span class="badge bg-success">Actif</span>
                                             {% else %}
-                                            <span class="badge bg-secondary">Inactif</span>
+                                                <span class="badge bg-secondary">Inactif</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ annee.date_debut }}</td>
@@ -144,53 +136,56 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    {% else %}
+                                {% else %}
                                     <tr>
                                         <td colspan="6" class="text-center">Aucune année scolaire définie</td>
                                     </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Gestion des niveaux -->
-    <div class="tab-pane fade" id="niveaux" role="tabpanel" aria-labelledby="niveaux-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Gestion des niveaux scolaires</h5>
-                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addNiveauModal">
-                            <i class="fas fa-plus me-1"></i> Ajouter
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Libellé</th>
-                                        <th>État</th>
-                                        <th>Classes</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for niveau in niveaux %}
+        <!-- Niveaux -->
+        <div class="tab-pane fade" id="niveaux" role="tabpanel">
+            <div class="page-header mb-4">
+                <div>
+                    <h1 class="page-title mb-1">Gestion des niveaux</h1>
+                    <p class="mb-0">Ajouter, modifier ou supprimer des niveaux scolaires</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title"><i class="fas fa-layer-group me-2"></i>Niveaux scolaires</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addNiveauModal">
+                        <i class="fas fa-plus me-1"></i> Ajouter
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Libellé</th>
+                                    <th>État</th>
+                                    <th>Classes</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for niveau in niveaux %}
                                     <tr>
                                         <td>{{ niveau.id }}</td>
                                         <td>{{ niveau.libelle }}</td>
                                         <td>
                                             {% if niveau.etat == 'actif' %}
-                                            <span class="badge bg-success">Actif</span>
+                                                <span class="badge bg-success">Actif</span>
                                             {% else %}
-                                            <span class="badge bg-secondary">Inactif</span>
+                                                <span class="badge bg-secondary">Inactif</span>
                                             {% endif %}
                                         </td>
                                         <td>{{ niveau.classes|length }}</td>
@@ -208,55 +203,58 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    {% else %}
+                                {% else %}
                                     <tr>
                                         <td colspan="5" class="text-center">Aucun niveau défini</td>
                                     </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Gestion des classes -->
-    <div class="tab-pane fade" id="classes" role="tabpanel" aria-labelledby="classes-tab">
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">Gestion des classes</h5>
-                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addClasseModal">
-                            <i class="fas fa-plus me-1"></i> Ajouter
-                        </button>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="filterNiveau" class="form-label">Filtrer par niveau</label>
-                            <select class="form-select" id="filterNiveau" onchange="filterClasses()">
-                                <option value="all">Tous les niveaux</option>
-                                {% for niveau in niveaux %}
+        <!-- Classes -->
+        <div class="tab-pane fade" id="classes" role="tabpanel">
+            <div class="page-header mb-4">
+                <div>
+                    <h1 class="page-title mb-1">Gestion des classes</h1>
+                    <p class="mb-0">Ajouter, modifier ou supprimer des classes</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title"><i class="fas fa-chalkboard me-2"></i>Classes</h5>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addClasseModal">
+                        <i class="fas fa-plus me-1"></i> Ajouter
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="filterNiveau" class="form-label">Filtrer par niveau</label>
+                        <select class="form-select" id="filterNiveau" onchange="filterClasses()">
+                            <option value="all">Tous les niveaux</option>
+                            {% for niveau in niveaux %}
                                 <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover" id="classesTable">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Niveau</th>
-                                        <th>Libellé</th>
-                                        <th>Effectif</th>
-                                        <th>État</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for classe in classes %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="classesTable">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Niveau</th>
+                                    <th>Libellé</th>
+                                    <th>Effectif</th>
+                                    <th>État</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for classe in classes %}
                                     <tr data-niveau="{{ classe.niveau_id }}">
                                         <td>{{ classe.id }}</td>
                                         <td>{{ classe.niveau.libelle }}</td>
@@ -264,9 +262,9 @@
                                         <td>{{ classe.effectif }}</td>
                                         <td>
                                             {% if classe.etat == 'actif' %}
-                                            <span class="badge bg-success">Actif</span>
+                                                <span class="badge bg-success">Actif</span>
                                             {% else %}
-                                            <span class="badge bg-secondary">Inactif</span>
+                                                <span class="badge bg-secondary">Inactif</span>
                                             {% endif %}
                                         </td>
                                         <td>
@@ -283,96 +281,100 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    {% else %}
+                                {% else %}
                                     <tr>
                                         <td colspan="6" class="text-center">Aucune classe définie</td>
                                     </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sauvegarde -->
+        <div class="tab-pane fade" id="backup" role="tabpanel">
+            <div class="page-header mb-4">
+                <div>
+                    <h1 class="page-title mb-1">Sauvegarde et restauration</h1>
+                    <p class="mb-0">Gérer les sauvegardes de la base de données</p>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title"><i class="fas fa-download me-2"></i>Sauvegarde de la base de données</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Créez une sauvegarde de la base de données pour conserver vos données en sécurité.</p>
+                            <form action="{{ url_for('admin.create_backup') }}" method="post">
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-download me-2"></i>Créer une sauvegarde
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h5 class="card-title"><i class="fas fa-upload me-2"></i>Restauration de la base de données</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Attention:</strong> cette action remplacera toutes les données actuelles.</p>
+                            <form action="{{ url_for('admin.restore_backup') }}" method="post">
+                                <div class="mb-3">
+                                    <label for="backupFile" class="form-label">Sélectionner une sauvegarde</label>
+                                    <select class="form-select" id="backupFile" name="backup_file" required>
+                                        <option value="" selected disabled>Choisir une sauvegarde</option>
+                                        {% for backup in backups %}
+                                            <option value="{{ backup.filename }}">{{ backup.display_name }}</option>
+                                        {% else %}
+                                            <option value="" disabled>Aucune sauvegarde disponible</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-warning" onclick="return confirm('Êtes-vous sûr de vouloir restaurer cette sauvegarde? Toutes les données actuelles seront remplacées.');">
+                                        <i class="fas fa-upload me-2"></i>Restaurer
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Sauvegarde/Restauration -->
-    <div class="tab-pane fade" id="backup" role="tabpanel" aria-labelledby="backup-tab">
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Sauvegarde de la base de données</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>Créez une sauvegarde de la base de données pour conserver vos données en sécurité.</p>
-                        <form action="{{ url_for('admin.create_backup') }}" method="post">
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-download me-2"></i>Créer une sauvegarde
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title"><i class="fas fa-exclamation-triangle me-2"></i>Zone de danger</h5>
                 </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0">Restauration de la base de données</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>Restaurez une sauvegarde précédente. <strong>Attention:</strong> cette action remplacera toutes les données actuelles.</p>
-                        <form action="{{ url_for('admin.restore_backup') }}" method="post">
-                            <div class="mb-3">
-                                <label for="backupFile" class="form-label">Sélectionner une sauvegarde</label>
-                                <select class="form-select" id="backupFile" name="backup_file" required>
-                                    <option value="" selected disabled>Choisir une sauvegarde</option>
-                                    {% for backup in backups %}
-                                    <option value="{{ backup.filename }}">{{ backup.display_name }}</option>
-                                    {% else %}
-                                    <option value="" disabled>Aucune sauvegarde disponible</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-warning" onclick="return confirm('Êtes-vous sûr de vouloir restaurer cette sauvegarde? Toutes les données actuelles seront remplacées.');">
-                                    <i class="fas fa-upload me-2"></i>Restaurer
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-12">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-white">
-                        <h5 class="card-title mb-0 text-danger">Zone de danger</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>Les actions suivantes sont irréversibles et peuvent entraîner une perte de données.</p>
-                        <form action="{{ url_for('admin.reset_database') }}" method="post" class="mb-3">
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="confirmReset" name="confirm_reset" required>
-                                <label class="form-check-label" for="confirmReset">
-                                    Je comprends que cette action est irréversible et que toutes les données seront perdues.
-                                </label>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-danger" onclick="return confirm('ATTENTION: Vous êtes sur le point de réinitialiser toute la base de données. Cette action est IRRÉVERSIBLE. Êtes-vous absolument sûr?');">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>Réinitialiser la base de données
-                                </button>
-                            </div>
-                        </form>
-                    </div>
+                <div class="card-body">
+                    <p>Les actions suivantes sont irréversibles et peuvent entraîner une perte de données.</p>
+                    <form action="{{ url_for('admin.reset_database') }}" method="post" class="mb-3">
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="confirmReset" name="confirm_reset" required>
+                            <label class="form-check-label" for="confirmReset">
+                                Je comprends que cette action est irréversible et que toutes les données seront perdues.
+                            </label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-danger" onclick="return confirm('ATTENTION: Vous êtes sur le point de réinitialiser toute la base de données. Cette action est IRRÉVERSIBLE. Êtes-vous absolument sûr?');">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Réinitialiser la base de données
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
+{% endblock %}
 
 <!-- Modal Ajouter Année Scolaire -->
 <div class="modal fade" id="addAnneeModal" tabindex="-1" aria-labelledby="addAnneeModalLabel" aria-hidden="true">
@@ -457,9 +459,9 @@
                         <select class="form-select" id="niveau_id" name="niveau_id" required>
                             <option value="" selected disabled>Sélectionner un niveau</option>
                             {% for niveau in niveaux %}
-                            {% if niveau.etat == 'actif' %}
-                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                            {% endif %}
+                                {% if niveau.etat == 'actif' %}
+                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                {% endif %}
                             {% endfor %}
                         </select>
                     </div>
@@ -486,21 +488,62 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
 {% block extra_js %}
 <script>
-    function filterClasses() {
-        const niveauId = document.getElementById('filterNiveau').value;
-        const rows = document.querySelectorAll('#classesTable tbody tr');
-        
-        rows.forEach(row => {
-            if (niveauId === 'all' || row.dataset.niveau === niveauId) {
-                row.style.display = '';
-            } else {
-                row.style.display = 'none';
+    document.addEventListener('DOMContentLoaded', function() {
+        // Active le tab correspondant au hash dans l'URL
+        const hash = window.location.hash;
+        if (hash) {
+            const tab = document.querySelector(`a[href="${hash}"]`);
+            if (tab) {
+                tab.click();
             }
+        }
+
+        // Filtrage des classes
+        window.filterClasses = function() {
+            const niveauId = document.getElementById('filterNiveau').value;
+            const rows = document.querySelectorAll('#classesTable tbody tr');
+            
+            rows.forEach(row => {
+                if (niveauId === 'all' || row.dataset.niveau === niveauId) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        };
+
+        // Gestion des onglets
+        const tabLinks = document.querySelectorAll('[data-bs-toggle="tab"]');
+        tabLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Retirer la classe active de tous les liens
+                tabLinks.forEach(l => l.classList.remove('active'));
+                
+                // Ajouter la classe active au lien cliqué
+                this.classList.add('active');
+                
+                // Masquer tous les panneaux d'onglets
+                const tabPanes = document.querySelectorAll('.tab-pane');
+                tabPanes.forEach(pane => {
+                    pane.classList.remove('show', 'active');
+                });
+                
+                // Afficher le panneau d'onglet correspondant
+                const target = this.getAttribute('href');
+                const targetPane = document.querySelector(target);
+                if (targetPane) {
+                    targetPane.classList.add('show', 'active');
+                }
+                
+                // Mettre à jour l'URL pour refléter l'onglet actif
+                history.pushState({}, '', `#${target.substring(1)}`);
+            });
         });
-    }
+    });
 </script>
 {% endblock %}

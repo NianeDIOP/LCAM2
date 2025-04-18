@@ -1,85 +1,239 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="row">
-    <div class="col-12 text-center mb-4">
-        <div class="bg-primary text-white p-4 rounded shadow">
-            <h1>Bienvenue dans {{ app_name }}</h1>
-            <p class="lead">Système de gestion des notes et analyses de performances scolaires</p>
-            <a href="{{ url_for('semestre1.index') }}" class="btn btn-light mt-2">Commencer l'analyse</a>
-        </div>
-    </div>
-</div>
-
-<div class="row mt-4">
-    <div class="col-md-4">
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body text-center">
-                <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
-                <h3>Module Semestre 1</h3>
-                <p>Importez et analysez les résultats du premier semestre. Visualisez les performances et générez des rapports.</p>
-                <a href="{{ url_for('semestre1.index') }}" class="btn btn-primary">Accéder</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body text-center">
-                <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
-                <h3>Module Semestre 2</h3>
-                <p>Gérez les résultats du second semestre. Comparez les performances avec le premier semestre.</p>
-                <a href="{{ url_for('semestre2.index') }}" class="btn btn-success">Accéder</a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card mb-4 shadow-sm">
-            <div class="card-body text-center">
-                <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
-                <h3>Module Général</h3>
-                <p>Analysez les tendances annuelles, comparez les semestres et prenez des décisions éclairées.</p>
-                <a href="#" class="btn btn-danger">Accéder</a>
+<div class="hero-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8 mx-auto text-center">
+                <h1 class="hero-title">Optimisez vos conseils de classe avec LCAMS</h1>
+                <p class="hero-text">Notre solution innovante permet de gérer efficacement les conseils de classe du premier et second semestre, en optimisant le suivi des performances des élèves à travers des analyses statistiques complètes et détaillées.</p>
+                <a href="#fonctionnalites" class="btn btn-light btn-lg">
+                    <i class="fas fa-arrow-right me-2"></i> Commencer maintenant
+                </a>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card shadow-sm">
-            <div class="card-header bg-secondary text-white">
-                <h3 class="card-title">Statistiques générales</h3>
+<div class="container">
+    <!-- Statistiques -->
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4 mb-5">
+        <div class="col-md-3 mb-3">
+            <div class="feature-card">
+                <i class="fas fa-user-graduate icon text-primary"></i>
+                <h2 class="text-primary fw-bold fs-1">{{ stats.total_eleves }}</h2>
+                <p class="text-muted">Élèves évalués</p>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-primary">{{ stats.total_eleves }}</h4>
-                            <p>Élèves</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-secondary">{{ stats.total_classes }}</h4>
-                            <p>Classes</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-success">{{ stats.taux_reussite }}%</h4>
-                            <p>Taux de réussite</p>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="text-center">
-                            <h4 class="text-info">{{ request.args.get('annee_scolaire', '') or '' }}</h4>
-                            <p>Année scolaire</p>
-                        </div>
-                    </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="feature-card">
+                <i class="fas fa-chalkboard icon text-info"></i>
+                <h2 class="text-info fw-bold fs-1">{{ stats.total_classes }}</h2>
+                <p class="text-muted">Classes</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="feature-card">
+                <i class="fas fa-check-circle icon text-success"></i>
+                <h2 class="text-success fw-bold fs-1">{{ stats.taux_reussite }}%</h2>
+                <p class="text-muted">Taux de réussite</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="feature-card">
+                <i class="fas fa-calendar-alt icon text-warning"></i>
+                <h2 class="text-warning fw-bold fs-1">{{ annee_active }}</h2>
+                <p class="text-muted">Année scolaire</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fonctionnalités clés -->
+    <h2 id="fonctionnalites" class="text-center text-primary mb-4 fw-bold">Fonctionnalités clés</h2>
+    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
+                    <h3>Module Semestre 1</h3>
+                    <p class="text-muted mb-4">Importez et analysez les résultats du premier semestre. Visualisez les performances et générez des rapports.</p>
+                    <a href="{{ url_for('semestre1.index') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-right me-1"></i> Accéder
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
+                    <h3>Module Semestre 2</h3>
+                    <p class="text-muted mb-4">Gérez les résultats du second semestre. Comparez les performances avec le premier semestre.</p>
+                    <a href="{{ url_for('semestre2.index') }}" class="btn btn-success">
+                        <i class="fas fa-arrow-right me-1"></i> Accéder
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body text-center p-4">
+                    <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
+                    <h3>Module Général</h3>
+                    <p class="text-muted mb-4">Analysez les tendances annuelles, comparez les semestres et prenez des décisions éclairées.</p>
+                    <a href="#" class="btn btn-danger">
+                        <i class="fas fa-arrow-right me-1"></i> Accéder
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Indicateurs de performance -->
+<section class="indicators-section">
+    <div class="container">
+        <h2 class="indicators-title">Indicateurs de performance</h2>
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4">
+            <div class="col-md-3 mb-4">
+                <div class="indicator-card">
+                    <i class="fas fa-percent icon"></i>
+                    <h3>Taux de réussite</h3>
+                    <p>Suivez l'évolution du taux de réussite par classe, niveau et établissement.</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="indicator-card">
+                    <i class="fas fa-chart-line icon"></i>
+                    <h3>Moyenne générale</h3>
+                    <p>Analysez les tendances de la moyenne générale à différents niveaux.</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="indicator-card">
+                    <i class="fas fa-user-graduate icon"></i>
+                    <h3>Performance par matière</h3>
+                    <p>Identifiez les points forts et les faiblesses dans chaque discipline.</p>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="indicator-card">
+                    <i class="fas fa-chart-area icon"></i>
+                    <h3>Progression semestrielle</h3>
+                    <p>Mesurez l'évolution des performances entre le premier et le second semestre.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Comment utiliser LCAMS -->
+<div class="container my-5">
+    <h2 class="text-center text-primary mb-4 fw-bold">Comment utiliser LCAMS</h2>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4">
+        <div class="col-md-3 mb-4">
+            <div class="step-card">
+                <div class="step-number">1</div>
+                <h3>Copier-coller les moyennes</h3>
+                <p>Utilisez les statistiques de PLANETE pour copier et coller les moyennes des élèves dans la base des semestres 1 ou 2 du logiciel.</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="step-card">
+                <div class="step-number">2</div>
+                <h3>Validation des données</h3>
+                <p>Validez les données collées pour assurer leur exactitude et fiabilité avant analyse.</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="step-card">
+                <div class="step-number">3</div>
+                <h3>Intégration des disciplines</h3>
+                <p>Copiez et collez les moyennes des disciplines dans leurs bases respectives du logiciel.</p>
+            </div>
+        </div>
+        <div class="col-md-3 mb-4">
+            <div class="step-card">
+                <div class="step-number">4</div>
+                <h3>Exploitation des résultats</h3>
+                <p>Naviguez librement dans le logiciel et téléchargez toutes les informations souhaitées pour vos analyses.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Statistiques disponibles -->
+<section class="bg-light py-5">
+    <div class="container">
+        <h2 class="text-center text-primary mb-4 fw-bold">Statistiques disponibles</h2>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-chart-line text-danger me-3 fa-2x"></i>
+                            <h3 class="mb-0">Statistiques par niveau</h3>
+                        </div>
+                        <p>Analysez les performances des élèves par niveau scolaire pour identifier les tendances et les besoins spécifiques.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-users text-primary me-3 fa-2x"></i>
+                            <h3 class="mb-0">Statistiques par classe</h3>
+                        </div>
+                        <p>Obtenez une vue détaillée des performances par classe pour mieux orienter les interventions pédagogiques.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-venus-mars text-info me-3 fa-2x"></i>
+                            <h3 class="mb-0">Statistiques par sexe</h3>
+                        </div>
+                        <p>Analysez les différences de performance entre les groupes pour assurer l'équité dans l'éducation.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-clipboard-list text-warning me-3 fa-2x"></i>
+                            <h3 class="mb-0">Décisions du conseil</h3>
+                        </div>
+                        <p>Suivez et analysez les décisions prises lors des conseils de classe pour assurer la cohérence et l'équité.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-medal text-success me-3 fa-2x"></i>
+                            <h3 class="mb-0">Classement par mérite</h3>
+                        </div>
+                        <p>Générez automatiquement des listes d'élèves classés par ordre de mérite pour chaque classe.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-book text-secondary me-3 fa-2x"></i>
+                            <h3 class="mb-0">Statistiques par discipline</h3>
+                        </div>
+                        <p>Analysez les performances dans chaque matière pour identifier les forces et les domaines nécessitant une attention particulière.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
 {% endblock %}
