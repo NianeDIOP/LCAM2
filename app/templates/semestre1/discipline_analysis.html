@@ -1,0 +1,390 @@
+{% extends 'with_sidebar.html' %}
+{% block body_class %}theme-discipline{% endblock %}
+
+{% set title = 'Semestre 1' %}
+
+{% block sidebar_content %}
+    <a href="{{ url_for('semestre1.index') }}#tab-overview" class="list-group-item{% if request.endpoint == 'semestre1.index' and (not request.args.get('tab') or request.args.get('tab') == 'overview') %} active{% endif %}">
+        <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
+    </a>
+    <a href="{{ url_for('semestre1.moyennes_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.moyennes_analysis' %} active{% endif %}">
+        <i class="fas fa-chart-line me-2"></i> Analyse des moyennes
+    </a>
+    <a href="{{ url_for('semestre1.discipline_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.discipline_analysis' %} active{% endif %}">
+        <i class="fas fa-leaf me-2"></i> Analyse par discipline
+    </a>
+    <a href="{{ url_for('semestre1.report') }}" class="list-group-item{% if request.endpoint == 'semestre1.report' %} active{% endif %}">
+        <i class="fas fa-file-alt me-2"></i> Rapports
+    </a>
+    <a href="{{ url_for('semestre1.index') }}#tab-import" class="list-group-item{% if request.args.get('tab') == 'import' %} active{% endif %}">
+        <i class="fas fa-upload me-2"></i> Importation
+    </a>
+    <div class="mt-auto p-3">
+        <hr class="border-white opacity-25">
+        <a href="{{ url_for('main.index') }}" class="list-group-item">
+            <i class="fas fa-home me-2"></i> Accueil
+        </a>
+        <a href="{{ url_for('admin.index') }}" class="list-group-item">
+            <i class="fas fa-cog me-2"></i> Paramètres
+        </a>
+    </div>
+{% endblock %}
+
+{% block main_content %}
+<div class="discipline-header mb-4">
+    <h1 class="fw-bold text-success mb-1">Analyse par discipline</h1>
+    <p class="text-muted">Visualisez les statistiques détaillées pour chaque matière du semestre 1 ({{ annee_scolaire }})</p>
+</div>
+
+<div class="card shadow-sm border-0 mb-4 p-3 bg-light-green">
+    <form id="filterDisciplineForm" class="row g-2 align-items-end">
+        <div class="col-md-2">
+            <label for="niveau" class="form-label">Niveau</label>
+            <select class="form-select form-select-sm" id="niveau" name="niveau_id">
+                <option value="">Tous niveaux</option>
+                {% for niv in niveaux %}
+                <option value="{{ niv.id }}" {% if filtres.niveau_id|string == niv.id|string %}selected{% endif %}>{{ niv.libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label for="classe" class="form-label">Classe</label>
+            <select class="form-select form-select-sm" id="classe" name="classe_id" {% if not classes %}disabled{% endif %}>
+                <option value="">Toutes classes</option>
+                {% for classe in classes %}
+                <option value="{{ classe.id }}" {% if filtres.classe_id|string == classe.id|string %}selected{% endif %}>{{ classe.libelle }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label for="discipline" class="form-label">Discipline</label>
+            <select class="form-select form-select-sm" id="discipline" name="discipline_id" disabled>
+                <option value="">Toutes disciplines</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <label for="sexe" class="form-label">Sexe</label>
+            <select class="form-select form-select-sm" id="sexe" name="sexe">
+                <option value="">Tous</option>
+                <option value="M" {% if filtres.sexe == 'M' %}selected{% endif %}>Masculin</option>
+                <option value="F" {% if filtres.sexe == 'F' %}selected{% endif %}>Féminin</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <label for="note_min" class="form-label">Note min</label>
+            <input type="number" step="0.1" min="0" max="20" class="form-control form-control-sm" id="note_min" name="note_min" value="{{ filtres.note_min|default('') }}">
+        </div>
+        <div class="col-md-1">
+            <label for="note_max" class="form-label">Note max</label>
+            <input type="number" step="0.1" min="0" max="20" class="form-control form-control-sm" id="note_max" name="note_max" value="{{ filtres.note_max|default('') }}">
+        </div>
+        <div class="col-md-2 d-grid align-items-end">
+            <button type="submit" class="btn btn-success btn-sm w-100" style="height:38px;">
+                <i class="fas fa-search me-1"></i>Filtrer
+            </button>
+        </div>
+    </form>
+</div>
+
+<div id="disciplineDashboard">
+    {% if stats %}
+    <!-- PARTIE 1: CARTES PRINCIPALES -->
+    <div class="row g-3 mb-3">
+        <!-- Moyenne et statistiques principales -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm stat-card-orange h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-chart-bar fa-2x text-warning mb-1"></i>
+                    <div class="fs-1 fw-bold">{{ stats.moyenne_discipline }}</div>
+                    <div class="text-uppercase small text-muted">Moyenne de la discipline</div>
+                    <div class="d-flex justify-content-around mt-2">
+                        <div class="small text-muted"><b>Min:</b> {{ stats.min }}</div>
+                        <div class="small text-muted"><b>Médiane:</b> {{ stats.mediane }}</div>
+                        <div class="small text-muted"><b>Max:</b> {{ stats.max }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Taux de réussite -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm stat-card-green h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-award fa-2x text-success mb-1"></i>
+                    <div class="fs-1 fw-bold">{{ stats.taux_reussite }}%</div>
+                    <div class="text-uppercase small text-muted">Taux de réussite</div>
+                    <div class="mt-2">≥10: <b>{{ stats.nb_moyenne }}</b> sur <b>{{ stats.nb_eleves }}</b> élèves</div>
+                </div>
+            </div>
+        </div>
+        <!-- Écart-type -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm stat-card-blue h-100">
+                <div class="card-body text-center">
+                    <i class="fas fa-balance-scale fa-2x text-primary mb-1"></i>
+                    <div class="fs-1 fw-bold">{{ stats.ecart_type }}</div>
+                    <div class="text-uppercase small text-muted">Écart-type</div>
+                    <div class="mt-2">Dispersion des notes</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PARTIE 2: RÉPARTITION PAR GENRE -->
+    <div class="row g-3 mb-3">
+        <!-- Répartition par genre -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-success"><i class="fas fa-users me-1"></i> Effectif</span>
+                    <span class="badge bg-success">{{ stats.nb_eleves }} élèves</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <i class="fas fa-female fa-lg text-danger"></i>
+                            <div class="fs-4 fw-bold">{{ stats.total_filles }}</div>
+                            <div class="small text-muted">Filles ({{ stats.pct_filles }}%)</div>
+                        </div>
+                        <div class="col-6">
+                            <i class="fas fa-male fa-lg text-primary"></i>
+                            <div class="fs-4 fw-bold">{{ stats.total_garcons }}</div>
+                            <div class="small text-muted">Garçons ({{ stats.pct_garcons }}%)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Réussite filles -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100 stat-card-pink">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-danger"><i class="fas fa-female me-1"></i> Filles</span>
+                    <span class="badge bg-danger">{{ stats.reussite_filles }}/{{ stats.total_filles }}</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="fs-3 fw-bold">{{ stats.taux_reussite_filles }}%</div>
+                    <div class="small text-muted">Taux de réussite filles</div>
+                </div>
+            </div>
+        </div>
+        <!-- Réussite garçons -->
+        <div class="col-lg-4 col-md-6">
+            <div class="card border-0 shadow-sm h-100 stat-card-blue">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-primary"><i class="fas fa-male me-1"></i> Garçons</span>
+                    <span class="badge bg-primary">{{ stats.reussite_garcons }}/{{ stats.total_garcons }}</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center text-center">
+                    <div class="fs-3 fw-bold">{{ stats.taux_reussite_garcons }}%</div>
+                    <div class="small text-muted">Taux de réussite garçons</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PARTIE 3: GRAPHIQUES -->
+    <div class="row g-3 mb-3">
+        <!-- Distribution des notes -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-success"><i class="fas fa-chart-line me-1"></i> Distribution des notes</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="disciplineNotesChart" style="max-height: 240px"></canvas>
+                </div>
+            </div>
+        </div>
+        <!-- Répartition des mentions -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-info"><i class="fas fa-percentage me-1"></i> Répartition des mentions</span>
+                </div>
+                <div class="card-body">
+                    <canvas id="disciplineMentionsChart" style="max-height: 240px"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PARTIE 4: MIN-MAX -->
+    <div class="row g-3">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-danger"><i class="fas fa-arrow-down me-1"></i> Note minimale</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center text-center py-2">
+                    <span class="display-6 fw-bold text-danger">{{ stats.min }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center py-2">
+                    <span class="fw-bold text-primary"><i class="fas fa-arrow-up me-1"></i> Note maximale</span>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center text-center py-2">
+                    <span class="display-6 fw-bold text-primary">{{ stats.max }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center my-5">
+        <i class="fas fa-info-circle me-2"></i>Sélectionnez une discipline pour afficher les statistiques.
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.theme-discipline main {
+    background: #f6fff7;
+}
+.bg-light-green {
+    background: #e8f5e9;
+}
+.stat-card-green {
+    background: #e8f5e9;
+}
+.stat-card-orange {
+    background: #fff3e0;
+}
+.stat-card-blue {
+    background: #e3f2fd;
+}
+.stat-card-pink {
+    background: #fde4ec;
+}
+.card .card-header {
+    background-color: transparent;
+}
+.card .card-header span {
+    font-size: 1rem;
+}
+.card .display-6 {
+    font-size: 2.2rem;
+}
+.card .fs-1 {
+    font-size: 2.2rem !important;
+}
+.card .fs-3 {
+    font-size: 1.8rem !important;
+}
+.card .fs-4 {
+    font-size: 1.5rem !important;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const niveauSelect = document.getElementById('niveau');
+    const classeSelect = document.getElementById('classe');
+    const disciplineSelect = document.getElementById('discipline');
+
+    function loadDisciplines(niveauId, classeId, selectedDisciplineId) {
+        disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+        disciplineSelect.disabled = true;
+        let url = '';
+        if (classeId) {
+            url = `/semestre1/api/disciplines/${classeId}`;
+        } else if (niveauId) {
+            url = `/semestre1/api/disciplines/niveau/${niveauId}`;
+        } else {
+            disciplineSelect.innerHTML = '<option value="">Sélectionnez un niveau ou une classe</option>';
+            disciplineSelect.disabled = true;
+            return;
+        }
+        fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                disciplineSelect.innerHTML = '<option value="">Toutes disciplines</option>';
+                data.forEach(d => {
+                    const option = document.createElement('option');
+                    option.value = d.id;
+                    option.textContent = d.libelle;
+                    if (selectedDisciplineId && String(selectedDisciplineId) === String(d.id)) option.selected = true;
+                    disciplineSelect.appendChild(option);
+                });
+                disciplineSelect.disabled = false;
+            });
+    }
+
+    // Initial load
+    const initialNiveau = niveauSelect.value;
+    const initialClasse = classeSelect.value;
+    const initialDiscipline = "{{ filtres.discipline_id|string }}";
+    loadDisciplines(initialNiveau, initialClasse, initialDiscipline);
+
+    niveauSelect.addEventListener('change', function() {
+        const niveauId = this.value;
+        classeSelect.innerHTML = '<option value="">Chargement...</option>';
+        classeSelect.disabled = true;
+        fetch(`/semestre1/api/classes/${niveauId}`)
+            .then(r => r.json())
+            .then(data => {
+                classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+                data.forEach(classe => {
+                    const option = document.createElement('option');
+                    option.value = classe.id;
+                    option.textContent = classe.libelle;
+                    classeSelect.appendChild(option);
+                });
+                classeSelect.disabled = false;
+                // Charger les disciplines pour le niveau (pas de classe sélectionnée)
+                loadDisciplines(niveauId, '', '');
+            });
+    });
+    classeSelect.addEventListener('change', function() {
+        const niveauId = niveauSelect.value;
+        const classeId = this.value;
+        loadDisciplines(niveauId, classeId, '');
+    });
+    // Charts dynamiques
+    {% if stats %}
+    const notesChart = document.getElementById('disciplineNotesChart');
+    if (notesChart) {
+        new Chart(notesChart, {
+            type: 'bar',
+            data: {
+                labels: {{ chart_data.labels|tojson }},
+                datasets: [{
+                    label: 'Nombre d\'élèves',
+                    data: {{ chart_data.data|tojson }},
+                    backgroundColor: '#43a047',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+    const mentionsChart = document.getElementById('disciplineMentionsChart');
+    if (mentionsChart) {
+        new Chart(mentionsChart, {
+            type: 'pie',
+            data: {
+                labels: {{ mentions_labels|tojson }},
+                datasets: [{
+                    data: {{ mentions_data|tojson }},
+                    backgroundColor: [
+                        '#43a047', '#ffa726', '#29b6f6', '#ffd600', '#ef5350', '#ab47bc', '#8d6e63'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } } }
+            }
+        });
+    }
+    {% endif %}
+});
+</script>
+{% endblock %}

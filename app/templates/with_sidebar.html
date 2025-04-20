@@ -2,18 +2,22 @@
 
 {% block content %}
 <div class="d-flex has-sidebar">
-    <div class="sidebar">
-        <div class="p-3 border-bottom border-white border-opacity-25">
-            <h5 class="mb-0 text-white">{{ title }}</h5>
+    <aside class="sidebar">
+        {# Use a consistent header structure #}
+        <div class="sidebar-header">
+            <h5 class="sidebar-title mb-0">{{ title }}</h5>
         </div>
-        <div class="list-group list-group-flush">
-            {% block sidebar_content %}{% endblock %}
-        </div>
+        <nav class="list-group list-group-flush">
+            {% block sidebar_content %}
+            {# Default empty sidebar content, to be overridden by child templates #}
+            {% endblock %}
+        </nav>
+    </aside>
+    {# Content area takes remaining space #}
+    <div class="content-area flex-grow-1" style="padding-top: 0.5rem;">
+        {# Removed container-fluid from here, add it inside main_content if needed #}
+        {% block main_content %}{% endblock %}
     </div>
-    <div class="content-area">
-        <div class="container-fluid">
-            {% block main_content %}{% endblock %}
-        </div>
-    </div>
+    {# Overlay is now in base.html #}
 </div>
 {% endblock %}

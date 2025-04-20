@@ -22,14 +22,16 @@
     --gray-800: #343a40;
     --gray-900: #212529;
     
-    --sidebar-width: 200px;
-    --header-height: 60px;
-    --footer-height: 60px;
+    --sidebar-width: 220px; /* Slightly wider sidebar */
+    --header-height: 56px; /* Slightly shorter header */
+    --footer-height: 50px;
     --gradient-primary: linear-gradient(45deg, var(--primary) 0%, var(--secondary) 100%);
     --shadow-sm: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
     --shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-    --radius: 8px;
-    --transition: all 0.3s ease;
+    --radius: 6px; /* Slightly smaller radius */
+    /* More specific transitions */
+    --transition-layout: margin-left 0.3s ease, transform 0.3s ease;
+    --transition-color: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   }
   
   /* Styles globaux */
@@ -41,7 +43,7 @@
     font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     color: var(--gray-800);
     line-height: 1.5;
-    font-size: 0.9rem; /* reduce default font size */
+    font-size: 0.875rem; /* Slightly smaller base font size */
     padding-top: var(--header-height); /* avoid content behind navbar */
   }
   
@@ -50,19 +52,24 @@
   }
   
   /* Headings scaling */
-  h1 { font-size: 2rem; }
-  h2 { font-size: 1.75rem; }
-  h3 { font-size: 1.25rem; }
+  h1, .h1 { font-size: 1.75rem; }
+  h2, .h2 { font-size: 1.5rem; }
+  h3, .h3 { font-size: 1.25rem; }
+  h4, .h4 { font-size: 1.1rem; }
+  h5, .h5 { font-size: 1rem; }
+  h6, .h6 { font-size: 0.9rem; }
   
   /* Navbar */
   .navbar {
-    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
-    padding: 0.75rem 1rem;
+    background: var(--gradient-primary);
+    padding: 0 1rem; /* Reduced vertical padding */
+    height: var(--header-height);
     box-shadow: var(--shadow-sm);
     position: fixed;
     top: 0;
     width: 100%;
     z-index: 1100;
+    transition: var(--transition-color);
   }
   
   .navbar-brand {
@@ -70,20 +77,22 @@
     align-items: center;
     color: white !important;
     font-weight: 600;
+    padding-top: 0;
+    padding-bottom: 0;
   }
   
   .brand-text {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     margin-left: 0.5rem;
   }
   
   .navbar-dark .navbar-nav .nav-link {
     color: rgba(255, 255, 255, 0.85);
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.8rem;
     margin: 0 0.125rem;
     border-radius: var(--radius);
     font-weight: 500;
-    transition: var(--transition);
+    transition: var(--transition-color);
   }
   
   .navbar-dark .navbar-nav .nav-link:hover {
@@ -105,27 +114,39 @@
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.9)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
   }
   
-  /* Sidebar (ne sera utilisée que dans les pages avec sidebar) */
+  /* Sidebar */
   .sidebar {
     width: var(--sidebar-width);
     position: fixed;
     top: var(--header-height);
     left: 0;
-    height: calc(100vh - var(--header-height) - var(--footer-height));
-    background: linear-gradient(to bottom, var(--primary) 0%, var(--secondary) 100%);
+    /* Adjust height calculation, remove footer height dependency */
+    height: calc(100vh - var(--header-height)); 
+    background: var(--gradient-primary); /* Default gradient */
     color: white;
     overflow-y: auto;
     z-index: 1000;
-    transition: var(--transition);
+    transition: var(--transition-layout); /* Use specific transition */
     box-shadow: var(--shadow);
+  }
+  
+  .sidebar-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .sidebar-title {
+    margin-bottom: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
   }
   
   .content-area {
     margin-left: 0; /* Par défaut, pas de margin pour la page d'accueil */
     padding: 1.5rem;
-    transition: var(--transition);
-    padding-top: 1rem; /* extra top padding */
+    transition: var(--transition-layout); /* Use specific transition */
     width: 100%;
+    min-height: calc(100vh - var(--header-height) - var(--footer-height)); /* Ensure content pushes footer down */
   }
   
   /* Pour les pages avec sidebar */
@@ -145,20 +166,30 @@
   /* Sidebar links */
   .sidebar .list-group-item {
     background: transparent;
-    color: white;
+    color: rgba(255, 255, 255, 0.85);
     border: none;
-    padding: .75rem 1.25rem;
-    transition: var(--transition);
+    padding: .7rem 1.25rem; /* Slightly reduced padding */
+    font-size: 0.875rem;
+    transition: var(--transition-color);
+    display: flex;
+    align-items: center;
+  }
+  
+  .sidebar .list-group-item i {
+    width: 20px; /* Ensure icons align */
+    margin-right: 0.75rem;
+    text-align: center;
   }
   
   .sidebar .list-group-item:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
     color: white;
   }
   
   .sidebar .list-group-item.active {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.2);
     color: white;
+    font-weight: 500;
   }
   
   /* Page d'accueil */
@@ -172,13 +203,13 @@
   }
   
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.25rem;
     font-weight: 700;
     margin-bottom: 1rem;
   }
   
   .hero-text {
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     margin-bottom: 1.5rem;
     opacity: 0.9;
   }
@@ -190,11 +221,11 @@
     box-shadow: var(--shadow-sm);
     margin-bottom: 1.5rem;
     overflow: hidden;
-    transition: var(--transition);
+    transition: transform 0.2s ease, box-shadow 0.2s ease; /* Specific transition */
   }
   
   .card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow);
   }
   
@@ -203,6 +234,9 @@
     border-bottom: 1px solid var(--gray-200);
     padding: 0.75rem 1rem;
     font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
   
   .card-title {
@@ -210,6 +244,10 @@
     color: var(--primary);
     font-weight: 600;
     font-size: 1rem;
+  }
+  
+  .card-body {
+      padding: 1rem; /* Consistent padding */
   }
   
   /* Feature cards pour la page d'accueil */
@@ -220,12 +258,12 @@
     background-color: white;
     box-shadow: var(--shadow-sm);
     height: 100%;
-    transition: var(--transition);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   
   .feature-card:hover {
     transform: translateY(-5px);
-    box-shadow: var(--shadow);
+    box-shadow: var (--shadow);
   }
   
   .feature-card .icon {
@@ -235,7 +273,7 @@
   }
   
   .feature-card h3 {
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin-bottom: 1rem;
     color: var(--primary);
@@ -243,7 +281,7 @@
   
   .feature-card p {
     color: var(--gray-600);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
   }
   
   /* Indicateurs de performance */
@@ -277,7 +315,7 @@
   
   .indicator-card h3 {
     color: var(--primary);
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
   }
@@ -320,7 +358,7 @@
   
   .step-card h3 {
     color: var(--primary);
-    font-size: 1.25rem;
+    font-size: 1.15rem;
     font-weight: 600;
     margin-bottom: 1rem;
     padding-left: 1.5rem;
@@ -328,70 +366,126 @@
   
   /* Footer */
   footer {
-    background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
-    color: white;
+    background: var(--gradient-primary);
+    color: rgba(255, 255, 255, 0.8);
     padding: 1rem 0;
     margin-top: auto;
+    height: var(--footer-height);
+    display: flex;
+    align-items: center;
+    font-size: 0.85rem;
   }
   
   /* Page header */
   .page-header {
-    padding: 0.75rem 0;
-    margin-bottom: 1.25rem;
+    padding: 0.25rem 0; /* Réduit de 0.5rem à 0.25rem */
+    margin-bottom: 0.75rem; /* Réduit de 1rem à 0.75rem */
     border-bottom: 1px solid var(--gray-200);
   }
   
   .page-header .page-title {
-    font-size: 1.75rem;
+    font-size: 1.4rem; /* Réduit de 1.5rem à 1.4rem */
     font-weight: 600;
     color: var(--primary);
+    margin-bottom: 0; /* Suppression de la marge inférieure */
+    line-height: 1.1; /* Réduit davantage la hauteur de ligne */
+  }
+  
+  .page-header p {
+    font-size: 0.75rem; /* Réduit de 0.8rem à 0.75rem */
+    margin-bottom: 0;
+    color: var(--gray-600);
+    line-height: 1.2; /* Ajoute une hauteur de ligne plus compacte */
+  }
+  
+  /* Style spécifique pour les onglets du semestre 1 */
+  .theme-semestre1 .tab-pane .page-header {
+    padding-top: 0.2rem; /* Réduit de 0.3rem à 0.2rem */
+    padding-bottom: 0.2rem; /* Réduit de 0.3rem à 0.2rem */
+    margin-bottom: 0.5rem; /* Réduit de 0.75rem à 0.5rem */
+  }
+  
+  /* Mise en page plus compacte pour les conteneurs d'onglets */
+  .tab-content > .tab-pane {
+    padding-top: 0.25rem; /* Ajoute un petit espacement en haut du contenu de l'onglet */
+  }
+  
+  /* Ajustements spécifiques pour les cartes qui suivent les en-têtes */
+  .page-header + .card,
+  .page-header + .row,
+  .page-header + div {
+    margin-top: 0.5rem;
   }
   
   /* Stat cards on overview */
   .stat-card {
     background-color: white;
-    border-radius: var(--radius);
+    border-radius: var (--radius);
     box-shadow: var(--shadow-sm);
-    padding: 0.85rem;
+    padding: 1rem;
     text-align: center;
-    transition: var(--transition);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
   }
   
   .stat-card:hover {
-    transform: translateY(-5px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow);
   }
   
   .stat-card .icon {
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     margin-bottom: 0.5rem;
+    color: var(--primary);
   }
   
   .stat-card .value {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 0.25rem;
     color: var(--primary);
+    line-height: 1.2;
   }
   
   .stat-card .label {
     color: var(--gray-600);
     font-size: 0.8rem;
+    text-transform: uppercase;
   }
   
   /* Responsive */
   @media (max-width: 992px) {
     .sidebar {
       transform: translateX(-100%);
+      z-index: 1050; /* Ensure sidebar is above content when shown */
     }
     
     .has-sidebar .content-area {
       margin-left: 0;
+      width: 100%;
     }
     
     .sidebar.show {
       transform: translateX(0);
+    }
+    
+    /* Add overlay when sidebar is shown on smaller screens */
+    .sidebar-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1040;
+        display: none;
+    }
+    .sidebar.show + .sidebar-overlay {
+        display: block;
     }
     
     .hero-title {
@@ -400,6 +494,39 @@
     
     .brand-text {
       font-size: 1.1rem;
+    }
+
+    .sidebar-toggle-btn {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    /* Styles pour l'overlay de la sidebar */
+    .sidebar-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1040;
+      display: none;
+    }
+    
+    .sidebar.show ~ .sidebar-overlay {
+      display: block;
+    }
+    
+    /* Ajouter un peu d'espace pour le bouton flottant */
+    body {
+      padding-bottom: 80px;
+    }
+    
+    /* Assurer que la sidebar est bien visible quand elle est ouverte */
+    .sidebar.show {
+      transform: translateX(0);
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
     }
   }
   
@@ -411,11 +538,14 @@
     .hero-text {
       font-size: 1rem;
     }
+    .content-area {
+        padding: 1rem;
+    }
   }
   
   @media (max-width: 576px) {
     .navbar {
-      padding: 0.5rem 1rem;
+      padding: 0 0.75rem;
     }
     
     .brand-text {
@@ -425,64 +555,95 @@
     .navbar-dark .navbar-nav .nav-link {
       padding: 0.5rem 0.75rem;
     }
+    .page-header .page-title {
+        font-size: 1.4rem;
+    }
+    .stat-card .value {
+        font-size: 1.3rem;
+    }
   }
 
   /* Theming: Semestre1 */
+  .theme-semestre1 {
+    --theme-primary: var(--info);
+    --theme-secondary: var(--secondary-light);
+    --theme-gradient: linear-gradient(45deg, var(--theme-primary) 0%, var(--theme-secondary) 100%);
+  }
   .theme-semestre1 .sidebar {
-    background: linear-gradient(45deg, var(--info) 0%, var(--secondary-light) 100%);
+    background: var(--theme-gradient);
   }
   .theme-semestre1 .page-header .page-title {
-    color: var(--info);
+    color: var(--theme-primary);
+  }
+  .theme-semestre1 .card-header.bg-theme {
+    background-color: var(--theme-primary);
+    color: white;
+    border-bottom: none;
+  }
+  .theme-semestre1 .card-header.bg-theme .card-title {
+      color: white;
+  }
+  .theme-semestre1 .stat-card .icon, .theme-semestre1 .stat-card .value {
+      color: var(--theme-primary);
+  }
+  .theme-semestre1 .btn-primary {
+      background-color: var(--theme-primary);
+      border-color: var(--theme-primary);
+  }
+  .theme-semestre1 .btn-primary:hover {
+      background-color: color-mix(in srgb, var(--theme-primary) 85%, black);
+      border-color: color-mix(in srgb, var(--theme-primary) 80%, black);
+  }
+  .theme-semestre1 .badge.bg-theme-primary {
+      background-color: var(--theme-primary) !important;
+  }
+  .theme-semestre1 .badge.bg-theme-secondary {
+      background-color: var(--theme-secondary) !important;
   }
 
   /* Theming: Admin */
+  .theme-admin {
+    --theme-primary: var(--dark);
+    --theme-secondary: var(--gray-700);
+    --theme-gradient: linear-gradient(45deg, var(--theme-primary) 0%, var(--theme-secondary) 100%);
+  }
   .theme-admin .sidebar {
-    background: linear-gradient(45deg, var(--dark) 0%, var(--gray-700) 100%);
+    background: var(--theme-gradient);
   }
   .theme-admin .page-header .page-title {
-    color: var(--dark);
+    color: var(--theme-primary);
+  }
+  .theme-admin .card-header.bg-theme {
+    background-color: var(--theme-primary);
+    color: white;
+    border-bottom: none;
+  }
+  .theme-admin .card-header.bg-theme .card-title {
+      color: white;
+  }
+  .theme-admin .stat-card .icon, .theme-admin .stat-card .value {
+      color: var(--theme-primary);
+  }
+  .theme-admin .btn-primary {
+      background-color: var(--theme-primary);
+      border-color: var(--theme-primary);
+  }
+  .theme-admin .btn-primary:hover {
+      background-color: color-mix(in srgb, var(--theme-primary) 85%, black);
+      border-color: color-mix(in srgb, var(--theme-primary) 80%, black);
+  }
+  .theme-admin .badge.bg-theme-primary {
+      background-color: var(--theme-primary) !important;
+  }
+  .theme-admin .badge.bg-theme-secondary {
+      background-color: var(--theme-secondary) !important;
   }
 
-  /* Styles d'optimisation d'espace */
-
-  /* Réduction de la taille des titres de page */
-  .page-header {
-    padding: 0.75rem 0;
-    margin-bottom: 1.25rem;
-    border-bottom: 1px solid var(--gray-200);
-  }
-
+  /* Styles d'optimisation d'espace (conservés et ajustés) */
   .page-title {
-    font-size: 1.5rem;
+    font-size: 1.6rem; /* Ajusté */
     font-weight: 600;
     margin-bottom: 0.25rem;
-  }
-
-  .page-header p {
-    font-size: 0.85rem;
-    margin-bottom: 0;
-    color: var(--gray-600);
-  }
-
-  /* Optimisation des cartes statistiques */
-  .stat-card {
-    padding: 0.85rem;
-    margin-bottom: 1rem;
-  }
-
-  .stat-card .icon {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .stat-card .value {
-    font-size: 1.4rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-  }
-
-  .stat-card .label {
-    font-size: 0.8rem;
   }
 
   /* Tables plus compactes */
@@ -498,39 +659,48 @@
 
   /* En-têtes de table plus compacts */
   .card-header {
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem; /* Ajusté */
   }
 
   .card-header .card-title {
-    font-size: 1rem;
+    font-size: 0.95rem; /* Ajusté */
     margin-bottom: 0;
   }
 
-  /* Espacement entre les rangées plus serré */
+  /* Espacement entre les rangées */
   .row {
-    margin-bottom: 1rem;
+    /* Suppression du margin-bottom global, gérer au cas par cas si besoin */
   }
 
   /* Taille des boutons ajustée */
   .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem; /* Ajusté */
+    font-size: 0.8rem; /* Ajusté */
+  }
+  .btn {
+      font-size: 0.875rem;
+      padding: 0.4rem 0.8rem;
   }
 
   /* Ajustement des marges dans la zone de contenu */
   .content-area {
-    padding: 1rem;
+    padding: 1.25rem; /* Ajusté */
   }
 
   /* Optimiser l'espacement dans les formulaires */
   .form-label {
     margin-bottom: 0.25rem;
     font-size: 0.85rem;
+    font-weight: 500;
   }
 
   .form-control, .form-select {
-    padding: 0.375rem 0.5rem;
+    padding: 0.4rem 0.6rem; /* Ajusté */
     font-size: 0.85rem;
+  }
+  .form-control-sm, .form-select-sm {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
   }
 
   .form-text {
@@ -541,4 +711,163 @@
   .nav-tabs .nav-link {
     padding: 0.5rem 0.75rem;
     font-size: 0.85rem;
+  }
+
+  /* Styles spécifiques au tableau de bord (déplacés depuis moyennes_analysis.html) */
+  .dashboard .card-header {
+      padding: 0.6rem 1rem;
+  }
+  
+  .dashboard .card-body {
+      padding: 1rem;
+  }
+  
+  .dashboard .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.1;
+  }
+  .dashboard .stat-label {
+      font-size: 0.8rem;
+      color: var(--gray-600);
+      text-transform: uppercase;
+  }
+  
+  /* Styles pour cercle de progression */
+  .circle-progress {
+      display: inline-block;
+      position: relative;
+  }
+  .circle-progress svg {
+      display: block;
+  }
+  .progress-value {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: var(--warning);
+      font-weight: bold;
+  }
+  .progress-label {
+      position: absolute;
+      top: 70%; /* Adjust as needed */
+      left: 50%;
+      transform: translate(-50%, 0);
+      font-size: 0.8rem;
+      color: var(--gray-600);
+  }
+
+  /* Styles spécifiques pour l'impression */
+  @media print {
+      body {
+          padding-top: 0 !important;
+          font-size: 10pt;
+      }
+      .sidebar, header, footer, form, .btn, .page-header div:last-child {
+          display: none !important;
+      }
+      .content-area {
+          margin-left: 0 !important;
+          width: 100% !important;
+          padding: 0.5cm !important;
+      }
+      .has-sidebar .content-area {
+          margin-left: 0 !important;
+          width: 100% !important;
+      }
+      .card {
+          page-break-inside: avoid;
+          box-shadow: none;
+          border: 1px solid var(--gray-300);
+          margin-bottom: 1rem;
+      }
+      
+      /* Correction pour éviter que le tableau masque les informations */
+      .page-header {
+          border-bottom: 1px solid var(--gray-400);
+          margin-bottom: 1rem;
+          position: relative;
+          page-break-after: avoid; /* Force l'en-tête à rester avec le début du tableau */
+      }
+      
+      /* Assure que les headers des tableaux ne sont pas séparés du contenu */
+      .table thead {
+          display: table-header-group;
+      }
+      
+      /* Évite les sauts de page à l'intérieur des lignes */
+      .table tr {
+          page-break-inside: avoid;
+      }
+      
+      /* Évite les sauts de page après l'en-tête du tableau */
+      .card-header {
+          page-break-after: avoid;
+      }
+      
+      /* Permet les sauts de page dans le corps du tableau si nécessaire */
+      .table tbody {
+          page-break-before: auto;
+          page-break-after: auto;
+      }
+      
+      /* Évite les espaces vides en haut des pages suivantes */
+      .tab-content, .tab-pane {
+          page-break-before: auto;
+          padding-top: 0 !important;
+      }
+      
+      .page-title {
+          font-size: 14pt;
+      }
+      .dashboard .stat-value {
+          font-size: 1.5rem;
+      }
+  }
+
+  /* Styles pour le bouton de toggle de la sidebar en mobile */
+  .sidebar-toggle-btn {
+    display: none;  /* Caché par défaut, visible uniquement en mode mobile */
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--gradient-primary);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 1030;
+    cursor: pointer;
+    font-size: 1.25rem;
+    transition: transform 0.2s ease;
+  }
+
+  .sidebar-toggle-btn:hover {
+    transform: scale(1.05);
+  }
+
+  .sidebar-toggle-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Style spécifique pour Vue d'ensemble et Analyse moyennes */
+  .theme-semestre1 #tab-overview .page-header,
+  .theme-semestre1 .moyennes-analysis-header {
+    padding-top: 0.1rem; /* Encore plus réduit */
+    padding-bottom: 0.1rem;
+    margin-bottom: 0.4rem;
+  }
+
+  /* Ajustements pour les boutons dans les en-têtes de page */
+  .page-header .btn {
+    padding: 0.25rem 0.5rem; /* Boutons plus petits */
+    font-size: 0.8rem;
+  }
+
+  /* Réduire les espaces entre les éléments dans les en-têtes */
+  .d-flex.justify-content-between.align-items-center.mb-6 {
+    margin-bottom: 0.75rem !important; /* Remplacer mb-6 par une marge plus petite */
   }

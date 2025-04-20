@@ -1,0 +1,1180 @@
+{% extends 'with_sidebar.html' %}
+{% block body_class %}theme-semestre1{% endblock %}
+
+{% set title = 'Semestre 1' %}
+
+{% block sidebar_content %}
+    <a href="{{ url_for('semestre1.index') }}" class="list-group-item{% if request.endpoint == 'semestre1.index' and not request.args.get('tab') %} active{% endif %}">
+        <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
+    </a>
+    <a href="{{ url_for('semestre1.moyennes_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.moyennes_analysis' %} active{% endif %}">
+        <i class="fas fa-chart-line me-2"></i> Analyse des moyennes
+    </a>
+    <a href="{{ url_for('semestre1.discipline_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.discipline_analysis' %} active{% endif %}">
+        <i class="fas fa-leaf me-2"></i> Analyse par discipline
+    </a>
+    <a href="{{ url_for('semestre1.report') }}" class="list-group-item{% if request.endpoint == 'semestre1.report' %} active{% endif %}">
+        <i class="fas fa-file-alt me-2"></i> Rapports
+    </a>
+    <a href="{{ url_for('semestre1.index') }}?tab=import" class="list-group-item{% if request.args.get('tab') == 'import' %} active{% endif %}">
+        <i class="fas fa-upload me-2"></i> Importation
+    </a>
+    <div class="mt-auto p-3">
+        <hr class="border-white opacity-25">
+        <a href="{{ url_for('main.index') }}" class="list-group-item">
+            <i class="fas fa-home me-2"></i> Accueil
+        </a>
+        <a href="{{ url_for('admin.index') }}" class="list-group-item">
+            <i class="fas fa-cog me-2"></i> Paramètres
+        </a>
+    </div>
+{% endblock %}
+
+{% block main_content %}
+<div class="container-fluid">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="page-title">Analyse en profondeur</h1>
+            <p class="text-muted">{{ annee_scolaire }}</p>
+        </div>
+        <div>
+            <select class="form-select form-select-sm" id="annee-selector">
+                <option selected>{{ annee_scolaire }}</option>
+                {# Add other years if available #}
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- SECTION RAPPORT MOYENNES GÉNÉRALES -->
+        <div class="col-md-6 mb-4">
+            <div class="card card-custom">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Rapport Moyennes Générales</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-custom-muted mb-3">Générer un rapport statistique complet sur les moyennes générales des élèves.</p>
+                    <form id="moyennesGeneralesForm" class="mb-3">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="niveau" class="form-label">Niveau</label>
+                                <select class="form-select" id="niveau" name="niveau_id">
+                                    <option value="">Tous les niveaux</option>
+                                    {% for niveau in niveaux %}
+                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="classe" class="form-label">Classe</label>
+                                <select class="form-select" id="classe" name="classe_id" disabled>
+                                    <option value="">Toutes les classes</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="button" class="btn btn-primary" id="btnGenerateGeneralReport">
+                                <i class="fas fa-file-export me-1"></i> Générer le rapport
+                            </button>
+                        </div>
+                    </form>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-1"></i> Ce rapport inclut toutes les statistiques calculées pour les moyennes générales : répartition par sexe, mentions, observations, etc.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECTION RAPPORT MOYENNES DISCIPLINES -->
+        <div class="col-md-6 mb-4">
+            <div class="card card-custom">
+                <div class="card-header bg-success text-white">
+                    <h5 class="card-title mb-0"><i class="fas fa-book me-2"></i>Rapport Moyennes Disciplines</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-custom-muted mb-3">Générer un rapport statistique détaillé pour les disciplines.</p>
+                    <div class="alert alert-secondary">
+                        <i class="fas fa-tools me-2"></i> Cette fonctionnalité sera disponible prochainement.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section pour les rapports récents -->
+    <div class="card card-custom mt-3">
+        <div class="card-header bg-light">
+            <h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>Rapports récents</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-custom mb-0">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Niveau</th>
+                            <th>Classe</th>
+                            <th>Date</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentReportsTable">
+                        <tr>
+                            <td colspan="5" class="text-center py-3">Aucun rapport récent</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal pour afficher le rapport généré -->
+<div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="reportModalLabel">Rapport détaillé</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body p-0" id="reportContent">
+                <!-- Le contenu du rapport sera injecté ici par JavaScript -->
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                    <p class="mt-3">Génération du rapport en cours...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                <button type="button" class="btn btn-primary" id="btnDownloadReport">
+                    <i class="fas fa-download me-2"></i> Télécharger
+                </button>
+                <button type="button" class="btn btn-success" id="btnPrintReport">
+                    <i class="fas fa-print me-2"></i> Imprimer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Inclure jsPDF pour la génération de PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<!-- Ajouter html2canvas pour des rendus plus fidèles -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+// Fonction utilitaire pour formater les nombres (manquante dans le code original)
+function formatNumber(num) {
+    if (num === undefined || num === null) return '0';
+    return parseFloat(num).toFixed(2).replace(/\.00$/, '');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    let etablissementNom = ""; // Variable globale pour stocker le nom de l'établissement
+    
+    // Références aux éléments du DOM
+    const niveauSelect = document.getElementById('niveau');
+    const classeSelect = document.getElementById('classe');
+    const btnGenerateReport = document.getElementById('btnGenerateGeneralReport');
+    const btnDownloadReport = document.getElementById('btnDownloadReport');
+    const btnPrintReport = document.getElementById('btnPrintReport');
+    const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+    const reportContent = document.getElementById('reportContent');
+    
+    // Ajouter du CSS pour les symboles mathématiques dans l'affichage HTML
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .symbol-gte:before {
+            content: "≥";
+            font-family: Arial, sans-serif;
+        }
+        .symbol-lt:before {
+            content: "<";
+            font-family: Arial, sans-serif;
+        }
+    `;
+    document.head.appendChild(styleElement);
+    
+    // Charger le nom de l'établissement depuis la base de données
+    fetch('/admin/api/configuration')
+        .then(response => response.json())
+        .then(data => {
+            if (data.nom_etablissement) {
+                etablissementNom = data.nom_etablissement;
+                console.log("Nom de l'établissement chargé:", etablissementNom);
+            }
+        })
+        .catch(error => console.error('Erreur lors du chargement de la configuration:', error));
+    
+    // Configuration la dépendance entre les sélecteurs niveau et classe
+    niveauSelect.addEventListener('change', function() {
+        const niveauId = this.value;
+        classeSelect.disabled = true;
+        classeSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        if (!niveauId) {
+            classeSelect.innerHTML = '<option value="">Toutes les classes</option>';
+            classeSelect.disabled = true;
+            return;
+        }
+        
+        // Appeler l'API pour charger les classes du niveau sélectionné
+        fetch(`/semestre1/api/classes/${niveauId}`)
+            .then(response => response.json())
+            .then(data => {
+                classeSelect.innerHTML = '<option value="">Toutes les classes</option>';
+                data.forEach(classe => {
+                    const option = document.createElement('option');
+                    option.value = classe.id;
+                    option.textContent = classe.libelle;
+                    classeSelect.appendChild(option);
+                });
+                classeSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                classeSelect.disabled = true;
+            });
+    });
+
+    // Gestionnaire pour le bouton de génération de rapport
+    btnGenerateReport.addEventListener('click', function() {
+        const niveauId = niveauSelect.value;
+        const classeId = classeSelect.value;
+        
+        // Mettre à jour le titre de la modal
+        let modalTitle = "Rapport Moyennes Générales";
+        if (niveauId) {
+            const niveauText = niveauSelect.options[niveauSelect.selectedIndex].text;
+            modalTitle += ` - ${niveauText}`;
+            
+            if (classeId) {
+                const classeText = classeSelect.options[classeSelect.selectedIndex].text;
+                modalTitle += ` - ${classeText}`;
+            }
+        }
+        document.getElementById('reportModalLabel').textContent = modalTitle;
+        
+        // Afficher la modal avec un indicateur de chargement
+        reportContent.innerHTML = `
+            <div class="text-center my-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <p class="mt-3 fw-bold">Génération du rapport en cours...</p>
+        `;
+        reportModal.show();
+        
+        // Appeler l'API pour récupérer les données du rapport
+        generateMoyennesGeneralesReport(niveauId, classeId);
+    });
+
+    // Fonction pour générer le rapport de moyennes générales
+    function generateMoyennesGeneralesReport(niveauId, classeId) {
+        // Construire l'URL avec les paramètres de filtrage
+        let apiUrl = '/semestre1/api/report/moyennes-generales';
+        const params = new URLSearchParams();
+        
+        if (niveauId) params.append('niveau_id', niveauId);
+        if (classeId) params.append('classe_id', classeId);
+        
+        if (params.toString()) {
+            apiUrl += '?' + params.toString();
+        }
+        
+        // Appeler l'API pour récupérer les données
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de la récupération des données : ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Ajouter le nom de l'établissement aux données
+                data.config = data.config || {};
+                data.config.nom_etablissement = etablissementNom;
+                
+                // Afficher le rapport dans la modal
+                displayGeneralReport(data);
+                
+                // Stocker les données pour le téléchargement ultérieur
+                btnDownloadReport.dataset.reportData = JSON.stringify(data);
+                
+                // Configurer le bouton de téléchargement PDF
+                btnDownloadReport.onclick = function() {
+                    generatePDF(data);
+                };
+                
+                // Configurer le bouton d'impression
+                btnPrintReport.onclick = function() {
+                    const printContent = document.createElement('div');
+                    printContent.innerHTML = reportContent.innerHTML;
+                    
+                    // Récupérer et modifier le contenu pour optimiser l'impression
+                    const printWindow = window.open('', '', 'width=900,height=650');
+                    printWindow.document.write('<html><head><title>Rapport LCAMS</title>');
+                    
+                    // Style ultra-optimisé pour tenir sur une seule page en mode paysage
+                    printWindow.document.write(`
+                    <style>
+                        @page { 
+                            size: A4 landscape; 
+                            margin: 5mm; 
+                        }
+                        body { 
+                            padding: 0; 
+                            margin: 0;
+                            font-family: Arial, sans-serif;
+                            font-size: 8pt;
+                            line-height: 1.1;
+                        }
+                        .report-header {
+                            margin-bottom: 3mm !important;
+                            border-bottom: 1px solid #ccc;
+                            padding-bottom: 2mm;
+                            text-align: center;
+                        }
+                        .report-header h2 {
+                            font-size: 12pt;
+                            font-weight: bold;
+                            margin: 0 0 1mm 0;
+                        }
+                        .card-custom { 
+                            margin-bottom: 3mm !important;
+                            page-break-inside: avoid;
+                            border: 1px solid #ddd;
+                            border-radius: 2px;
+                            box-shadow: none;
+                        }
+                        .card-header {
+                            font-weight: bold;
+                            background-color: #f0f0f0;
+                            padding: 1mm !important;
+                            font-size: 9pt;
+                            border-bottom: 1px solid #ccc;
+                        }
+                        .card-body { 
+                            padding: 2mm !important; 
+                        }
+                        h3, h4, h5 { 
+                            font-size: 9pt;
+                            margin: 1mm 0;
+                        }
+                        .row {
+                            display: flex;
+                            flex-wrap: wrap;
+                            clear: both;
+                            margin-bottom: 2mm;
+                        }
+                        .col-md-3, .col-md-5, .col-md-6, .col-md-7, .col-auto, .col, .col-sm-6, .col-6 {
+                            box-sizing: border-box;
+                            float: left;
+                            padding: 0 1mm;
+                        }
+                        .col-md-3, .col-sm-6, .col-6 { width: 25%; }
+                        .col-md-5 { width: 41.66%; }
+                        .col-md-6 { width: 50%; }
+                        .col-md-7 { width: 58.33%; }
+                        
+                        /* Tables améliorés pour économiser de l'espace */
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-size: 7pt;
+                        }
+                        th, td {
+                            border: 0.5px solid #ddd;
+                            padding: 1mm;
+                            text-align: left;
+                        }
+                        th {
+                            background-color: #f0f0f0;
+                            font-weight: bold;
+                        }
+                        
+                        /* Stats boxes compactées */
+                        .stat-box {
+                            text-align: center;
+                            border: 1px solid #ddd;
+                            padding: 1mm !important;
+                            margin-bottom: 1mm;
+                            background-color: #f9f9f9;
+                            border-radius: 2px;
+                        }
+                        .display-5 {
+                            font-size: 10pt !important;
+                            font-weight: bold;
+                            margin: 0;
+                        }
+                        
+                        /* Badges plus petits */
+                        .badge {
+                            display: inline-block;
+                            padding: 0.5mm 1mm;
+                            border-radius: 2px;
+                            font-weight: normal;
+                            font-size: 7pt;
+                            color: white;
+                            margin: 0 0.5mm;
+                        }
+                        .bg-success, .badge-success { background-color: #28a745; }
+                        .bg-info, .badge-info { background-color: #17a2b8; }
+                        .bg-primary, .badge-primary { background-color: #007bff; }
+                        .bg-warning, .badge-warning { background-color: #ffc107; color: black; }
+                        .bg-danger, .badge-danger { background-color: #dc3545; }
+                        
+                        /* Utilités */
+                        .fw-bold { font-weight: bold; }
+                        .text-center { text-align: center; }
+                        .text-right { text-align: right; }
+                        .text-muted { color: #666; }
+                        .mt-1 { margin-top: 1mm; }
+                        .mb-0 { margin-bottom: 0; }
+                        
+                        /* Suppression des éléments non essentiels */
+                        .alert, .btn, button, .modal-footer, hr,
+                        .py-3, .my-5, .p-3, .p-4, .mt-4, .mb-4, .pt-3 {
+                            display: none !important;
+                            margin: 0 !important;
+                            padding: 0 !important;
+                        }
+
+                        /* Suppression des icônes pour gagner de l'espace */
+                        .fas, .fa-chart-bar, .fa-venus-mars, .fa-award, .fa-calculator, 
+                        .fa-comment-alt, .fa-male, .fa-female, i {
+                            display: none !important;
+                        }
+                        
+                        /* Layout ultra-optimisé */
+                        .print-compact-layout {
+                            display: flex;
+                            flex-wrap: wrap;
+                        }
+                        .print-header {
+                            width: 100%;
+                            margin-bottom: 2mm;
+                            text-align: center;
+                        }
+                        .print-stats {
+                            width: 100%;
+                            margin-bottom: 2mm;
+                            display: flex;
+                            justify-content: space-between;
+                        }
+                        .print-stats-item {
+                            width: 24%;
+                        }
+                        .print-left-column {
+                            width: 40%;
+                        }
+                        .print-right-column {
+                            width: 59%;
+                            margin-left: 1%;
+                        }
+                        .print-bottom-row {
+                            width: 100%;
+                            display: flex;
+                            justify-content: space-between;
+                        }
+                        .print-bottom-left {
+                            width: 59%;
+                        }
+                        .print-bottom-right {
+                            width: 40%;
+                            margin-left: 1%;
+                        }
+                        .compact-table td, .compact-table th {
+                            padding: 0.7mm;
+                            font-size: 7pt;
+                        }
+                        .footer {
+                            width: 100%;
+                            text-align: center;
+                            margin-top: 1mm;
+                            font-size: 6pt;
+                            color: #666;
+                            border-top: 0.5px solid #ddd;
+                            padding-top: 1mm;
+                        }
+                        .etablissement {
+                            font-size: 8pt;
+                            margin-bottom: 1mm;
+                        }
+                        .table-condensed tr, .table-condensed td {
+                            line-height: 1 !important;
+                        }
+                    </style>
+                    `);
+                    
+                    printWindow.document.write('</head><body>');
+                    
+                    // Récupérer le contenu original
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = printContent.innerHTML;
+                    
+                    // Récupérer les informations d'en-tête
+                    const headerInfo = {
+                        etablissement: tempDiv.querySelector('.etablissement') ? 
+                            tempDiv.querySelector('.etablissement').textContent : 'Établissement',
+                        titre: tempDiv.querySelector('.report-header h2') ? 
+                            tempDiv.querySelector('.report-header h2').textContent : 'Rapport Moyennes Générales',
+                        anneeScolaire: tempDiv.querySelector('.report-header p') ? 
+                            tempDiv.querySelector('.report-header p').textContent : '',
+                        niveau: tempDiv.querySelector('.badge') ? 
+                            tempDiv.querySelector('.badge').textContent : 'Tous niveaux',
+                        classe: tempDiv.querySelectorAll('.badge')[1] ? 
+                            tempDiv.querySelectorAll('.badge')[1].textContent : ''
+                    };
+                    
+                    // Extraire les données statistiques
+                    const statsBoxes = Array.from(tempDiv.querySelectorAll('.stat-box'));
+                    const statTables = Array.from(tempDiv.querySelectorAll('.table'));
+                    
+                    // Construire le contenu HTML ultra-compact
+                    let compactHtml = `
+                        <div class="print-compact-layout">
+                            <!-- En-tête compact -->
+                            <div class="print-header">
+                                <h4 class="etablissement">${headerInfo.etablissement}</h4>
+                                <h2>${headerInfo.titre}</h2>
+                                <p class="mb-0">${headerInfo.anneeScolaire} | ${headerInfo.niveau} ${headerInfo.classe}</p>
+                            </div>
+                            
+                            <!-- Statistiques principales en ligne -->
+                            <div class="print-stats">
+                                ${statsBoxes.slice(0, 4).map(box => 
+                                    `<div class="print-stats-item stat-box">
+                                        <h3 class="display-5">${box.querySelector('.display-5').textContent}</h3>
+                                        <p class="mb-0">${box.querySelector('p').textContent}</p>
+                                    </div>`
+                                ).join('')}
+                            </div>
+                            
+                            <!-- Section répartition par sexe et mentions -->
+                            <div class="print-bottom-row">
+                                <div class="print-bottom-left">
+                                    <div class="card-custom">
+                                        <div class="card-header">Répartition par sexe et mentions</div>
+                                        <div class="card-body p-0">
+                                            ${statTables[0] ? 
+                                                statTables[0].outerHTML.replace('table table-striped table-custom table-custom-bordered', 
+                                                                        'table table-condensed compact-table') : ''}
+                                        </div>
+                                    </div>
+                                    <div class="card-custom">
+                                        <div class="card-header">Répartition des mentions</div>
+                                        <div class="card-body p-0">
+                                            ${statTables[1] ? 
+                                                statTables[1].outerHTML.replace('table table-striped table-custom table-custom-bordered', 
+                                                                        'table table-condensed compact-table') : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="print-bottom-right">
+                                    <!-- Stats avancées -->
+                                    <div class="card-custom">
+                                        <div class="card-header">Statistiques avancées</div>
+                                        <div class="card-body">
+                                            <div style="display: flex; flex-wrap: wrap; justify-content: space-between;">
+                                                ${statsBoxes.slice(4, 8).map(box => 
+                                                    `<div style="width: 49%; margin-bottom: 1mm;" class="stat-box">
+                                                        <h4 class="mb-0">${box.querySelector('h4').textContent}</h4>
+                                                        <p class="mb-0" style="font-size: 7pt;">${box.querySelector('p').textContent}</p>
+                                                    </div>`
+                                                ).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Observations conseil -->
+                                    <div class="card-custom">
+                                        <div class="card-header">Observations conseil</div>
+                                        <div class="card-body p-0">
+                                            ${statTables[2] ? 
+                                                statTables[2].outerHTML.replace('table table-striped table-custom table-custom-bordered mb-0', 
+                                                                        'table table-condensed compact-table') : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="footer">
+                                Rapport généré le ${new Date().toLocaleDateString('fr-FR')} | © LCAMS ${new Date().getFullYear()}
+                            </div>
+                        </div>
+                    `;
+                    
+                    printWindow.document.write(compactHtml);
+                    printWindow.document.write('</body></html>');
+                    printWindow.document.close();
+                    printWindow.focus();
+                    
+                    // Laisser un peu plus de temps au navigateur pour traiter les styles
+                    setTimeout(function() {
+                        printWindow.print();
+                        printWindow.close();
+                    }, 500);
+                };
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                reportContent.innerHTML = `
+                    <div class="alert alert-danger m-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erreur lors de la génération du rapport : ${error.message}
+                    </div>
+                `;
+            });
+    }
+
+    // Fonction pour afficher le rapport dans la modal
+    function displayGeneralReport(data) {
+        // Vérifier si des données ont été retournées
+        if (!data || !data.stats) {
+            reportContent.innerHTML = `
+                <div class="alert alert-info m-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Aucune donnée disponible pour ce rapport.
+                </div>
+            `;
+            return;
+        }
+        
+        // Formater les statistiques pour l'affichage
+        const stats = data.stats;
+        const annee = data.annee_scolaire;
+        const filter = data.filter || {};
+        const config = data.config || {}; // Configuration contenant le nom de l'établissement
+        
+        // Construction du contenu HTML du rapport avec design amélioré
+        let html = `
+            <div class="report-header p-4 mb-4">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h4 class="etablissement mb-2">${config.nom_etablissement || 'Établissement'}</h4>
+                        <h2 class="mb-1">Rapport Moyennes Générales</h2>
+                        <p class="mb-0">Année scolaire: ${annee} | Semestre 1</p>
+                    </div>
+                    <div class="col-auto text-center">
+                        <span class="badge bg-light text-dark fs-6 p-2 shadow-sm">${filter.niveau || 'Tous niveaux'}</span>
+                        ${filter.classe ? `<span class="badge bg-light text-dark fs-6 p-2 shadow-sm ms-2">${filter.classe}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="report-content p-4">
+                <!-- Statistiques générales -->
+                <div class="card card-custom mb-4">
+                    <div class="card-header text-white" style="background-color: #3949ab;">
+                        <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Statistiques générales</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${stats.total_eleves}</h3>
+                                    <p class="mb-0 fw-bold text-primary">Total élèves</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${formatNumber(stats.moyenne_generale)}</h3>
+                                    <p class="mb-0 fw-bold text-info">Moyenne générale</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${stats.reussite_count}</h3>
+                                    <p class="mb-0 fw-bold text-success">Élèves <span class="symbol-gte"></span> 10</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${formatNumber(stats.taux_reussite)}%</h3>
+                                    <p class="mb-0 fw-bold text-warning">Taux de réussite</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistiques par sexe -->
+                <div class="card card-custom mb-4">
+                    <div class="card-header text-white" style="background-color: #1e88e5;">
+                        <h5 class="card-title mb-0"><i class="fas fa-venus-mars me-2"></i>Répartition par sexe</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-custom table-custom-bordered">
+                                <thead>
+                                    <tr class="table-secondary">
+                                        <th>Catégorie</th>
+                                        <th class="text-center">Total</th>
+                                        <th class="text-center">Pourcentage du total</th>
+                                        <th class="text-center">Moyenne <span class="symbol-gte"></span> 10</th>
+                                        <th class="text-center">% de réussite interne</th>
+                                        <th class="text-center">% du total des réussites</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><i class="fas fa-male text-primary me-2"></i> Garçons</td>
+                                        <td class="text-center fw-bold">${stats.total_garcons}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_garcons)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_garcons}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_garcons)}%</td>
+                                        <td class="text-center">${formatNumber((stats.reussite_garcons / stats.reussite_count) * 100)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td><i class="fas fa-female text-danger me-2"></i> Filles</td>
+                                        <td class="text-center fw-bold">${stats.total_filles}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_filles)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_filles}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_filles)}%</td>
+                                        <td class="text-center">${formatNumber((stats.reussite_filles / stats.reussite_count) * 100)}%</td>
+                                    </tr>
+                                    <tr class="table-secondary fw-bold">
+                                        <td>Total</td>
+                                        <td class="text-center">${stats.total_eleves}</td>
+                                        <td class="text-center">100%</td>
+                                        <td class="text-center">${stats.reussite_count}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite)}%</td>
+                                        <td class="text-center">100%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Répartition des mentions -->
+                    <div class="col-md-7">
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #43a047;">
+                                <h5 class="card-title mb-0"><i class="fas fa-award me-2"></i>Répartition des mentions</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-custom table-custom-bordered">
+                                        <thead>
+                                            <tr class="table-secondary">
+                                                <th>Mention</th>
+                                                <th class="text-center">Nombre d'élèves</th>
+                                                <th class="text-center">Pourcentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><span class="badge bg-success badge-custom">Félicitations</span> (<span class="symbol-gte"></span> 17)</td>
+                                                <td class="text-center fw-bold">${stats.felicitations}</td>
+                                                <td class="text-center">${formatNumber((stats.felicitations / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-info badge-custom">Encouragements</span> (<span class="symbol-gte"></span> 15 et <span class="symbol-lt"></span> 17)</td>
+                                                <td class="text-center fw-bold">${stats.encouragements}</td>
+                                                <td class="text-center">${formatNumber((stats.encouragements / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-primary badge-custom">Tableau d'honneur</span> (<span class="symbol-gte"></span> 12 et <span class="symbol-lt"></span> 15)</td>
+                                                <td class="text-center fw-bold">${stats.tableau_honneur}</td>
+                                                <td class="text-center">${formatNumber((stats.tableau_honneur / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-warning badge-custom text-dark">Passable</span> (<span class="symbol-gte"></span> 10 et <span class="symbol-lt"></span> 12)</td>
+                                                <td class="text-center fw-bold">${stats.passable}</td>
+                                                <td class="text-center">${formatNumber((stats.passable / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-danger badge-custom">Insuffisant</span> (<span class="symbol-lt"></span> 10)</td>
+                                                <td class="text-center fw-bold">${stats.insuffisant}</td>
+                                                <td class="text-center">${formatNumber((stats.insuffisant / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques avancées -->
+                    <div class="col-md-5">
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #5e35b1;">
+                                <h5 class="card-title mb-0"><i class="fas fa-calculator me-2"></i>Statistiques avancées</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.mediane)}</h4>
+                                            <p class="mb-0 text-primary">Médiane</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.ecart_type)}</h4>
+                                            <p class="mb-0 text-primary">Écart-type</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.plus_faible_moyenne)}</h4>
+                                            <p class="mb-0 text-danger">Minimum</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.plus_forte_moyenne)}</h4>
+                                            <p class="mb-0 text-success">Maximum</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Observations conseil -->
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #fb8c00;">
+                                <h5 class="card-title mb-0"><i class="fas fa-comment-alt me-2"></i>Observations conseil</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-custom table-custom-bordered mb-0">
+                                        <thead>
+                                            <tr class="table-secondary">
+                                                <th>Observation</th>
+                                                <th class="text-center">Nombre</                                                <th class="text-center">%</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><span class="badge bg-success badge-custom">Satisfait doit continuer</span></td>
+                                                <td class="text-center fw-bold">${stats.doit_continuer}</td>
+                                                <td class="text-center">${formatNumber((stats.doit_continuer / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-warning badge-custom text-dark">Peut mieux faire</span></td>
+                                                <td class="text-center fw-bold">${stats.mieux_faire}</td>
+                                                <td class="text-center">${formatNumber((stats.mieux_faire / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-danger badge-custom">Risque de redoubler</span></td>
+                                                <td class="text-center fw-bold">${stats.risque_redoubler}</td>
+                                                <td class="text-center">${formatNumber((stats.risque_redoubler / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pied de page du rapport -->
+                <div class="text-center text-muted mt-4 pt-3 border-top">
+                    <p class="mb-1">Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+                    <p class="mb-0">© LCAMS ${new Date().getFullYear()} - Système d'analyse statistique</p>
+                </div>
+            </div>
+        `;
+        
+        // Injecter le HTML dans la modal
+        reportContent.innerHTML = html;
+    }
+
+    // Fonction optimisée pour générer un PDF en format A4 clair et complet
+    function generatePDF(data) {
+        const { jsPDF } = window.jspdf;
+        
+        try {
+            // Afficher une notification de chargement
+            const notification = document.createElement('div');
+            notification.classList.add('alert', 'alert-info', 'position-fixed', 'top-0', 'end-0', 'm-3');
+            notification.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Génération du PDF en cours...';
+            notification.style.zIndex = '9999';
+            document.body.appendChild(notification);
+            
+            // Créer un document PDF au format A4 portrait
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Dimensions
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 10;
+            
+            // Extraction des données
+            const stats = data.stats;
+            const annee = data.annee_scolaire;
+            const filter = data.filter || {};
+            const config = data.config || {};
+            const etablissement = config.nom_etablissement || 'Établissement';
+            const date = new Date().toLocaleDateString('fr-FR');
+            
+            // En-tête
+            doc.setFillColor(13, 71, 161);
+            doc.rect(0, 0, pageWidth, 20, 'F');
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text('RAPPORT MOYENNES GÉNÉRALES', pageWidth / 2, 10, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.text(`${etablissement} - Année scolaire ${annee} - Semestre 1`, pageWidth / 2, 16, { align: 'center' });
+            
+            // Informations de filtrage
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            doc.text(`Niveau: ${filter.niveau || 'Tous'}${filter.classe ? ' | Classe: ' + filter.classe : ''}`, pageWidth / 2, 30, { align: 'center' });
+            
+            // Date de génération
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            doc.text(`Généré le ${date}`, pageWidth - margin, 38, { align: 'right' });
+            
+            // 1. Statistiques principales - Table simple
+            let currentY = 45;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(13, 71, 161);
+            doc.setFontSize(12);
+            doc.text('Statistiques principales', margin, currentY);
+            
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.1);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Statistique', margin + 5, currentY + 10);
+            doc.text('Valeur', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Données du tableau
+            const statsData = [
+                { label: 'Effectif total', value: stats.total_eleves },
+                { label: 'Moyenne générale', value: formatNumber(stats.moyenne_generale) + '/20' },
+                { label: 'Médiane', value: formatNumber(stats.mediane) + '/20' },
+                { label: 'Élèves >= 10', value: stats.reussite_count }, // Remplacement de ≥ par >=
+                { label: 'Taux de réussite', value: formatNumber(stats.taux_reussite) + '%' },
+                { label: 'Note minimale', value: formatNumber(stats.plus_faible_moyenne) + '/20' },
+                { label: 'Note maximale', value: formatNumber(stats.plus_forte_moyenne) + '/20' }
+            ];
+            
+            currentY += 13;
+            statsData.forEach((row, i) => {
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(row.value), pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // 2. Répartition par sexe avec réussite interne
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(13, 71, 161);
+            doc.setFontSize(12);
+            doc.text('Répartition par sexe (réussite interne)', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            doc.text('Catégorie', margin + 5, currentY + 10);
+            doc.text('Effectif', margin + 40, currentY + 10, { align: 'center' });
+            doc.text('% du total', margin + 65, currentY + 10, { align: 'center' });
+            doc.text('Moy >= 10', margin + 90, currentY + 10, { align: 'center' });
+            doc.text('Taux réussite', margin + 115, currentY + 10, { align: 'center' });
+            doc.text('Moy. catégorie', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Lignes du tableau
+            const genreData = [
+                { label: 'Garçons', count: stats.total_garcons, percent: formatNumber(stats.pct_garcons) + '%', 
+                  success: stats.reussite_garcons, rate: formatNumber(stats.taux_reussite_garcons) + '%', 
+                  moyenne: formatNumber(stats.moyenne_garcons) + '/20' },
+                { label: 'Filles', count: stats.total_filles, percent: formatNumber(stats.pct_filles) + '%', 
+                  success: stats.reussite_filles, rate: formatNumber(stats.taux_reussite_filles) + '%',
+                  moyenne: formatNumber(stats.moyenne_filles) + '/20' },
+                { label: 'Total', count: stats.total_eleves, percent: '100%', 
+                  success: stats.reussite_count, rate: formatNumber(stats.taux_reussite) + '%',
+                  moyenne: formatNumber(stats.moyenne_generale) + '/20' }
+            ];
+            
+            currentY += 13;
+            genreData.forEach((row, i) => {
+                // Fond alterné pour les lignes
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                // Mise en gras pour la ligne Total
+                doc.setFont(i === 2 ? 'helvetica' : 'helvetica', i === 2 ? 'bold' : 'normal');
+                
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.text(String(row.count), margin + 40, currentY + 5, { align: 'center' });
+                doc.text(row.percent, margin + 65, currentY + 5, { align: 'center' });
+                doc.text(String(row.success), margin + 90, currentY + 5, { align: 'center' });
+                doc.text(row.rate, margin + 115, currentY + 5, { align: 'center' });
+                doc.text(row.moyenne, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // 3. Répartition par mention (avec explications)
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(13, 71, 161);
+            doc.setFontSize(12);
+            doc.text('Répartition par mention', margin, currentY);
+            
+            // Légende pour le calcul des mentions avec un meilleur formatage
+            currentY += 4;
+            doc.setFontSize(9);
+            doc.setTextColor(80, 80, 80);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Barème des mentions:', margin, currentY);
+            
+            currentY += 5;
+            doc.setFont('helvetica', 'normal');
+            // Utiliser des espacements uniformes et séparation claire des mentions avec symboles ASCII
+            doc.text('Felicitations (>= 17)   |   Encouragements (15-16,99)   |   Tableau d\'honneur (12-14,99)', margin, currentY);
+            
+            currentY += 5;
+            doc.text('Passable (10-11,99)   |   Insuffisant (< 10)', margin, currentY);
+            
+            // Espace réduit entre le barème et le tableau
+            currentY += 12; // Réduit de 20 à 12 pour un espacement plus compact mais suffisant
+            
+            // En-tête du tableau - complètement séparé du barème
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Mention', margin + 5, currentY + 5);
+            doc.text('Nombre', pageWidth / 2, currentY + 5, { align: 'center' });
+            doc.text('Pourcentage', pageWidth - margin - 5, currentY + 5, { align: 'right' });
+            
+            // Lignes du tableau
+            const mentionData = [
+                { label: 'Félicitations (>= 17)', count: stats.felicitations, percent: formatNumber((stats.felicitations / stats.total_eleves) * 100) + '%' },
+                { label: 'Encouragements (15-16,99)', count: stats.encouragements, percent: formatNumber((stats.encouragements / stats.total_eleves) * 100) + '%' },
+                { label: 'Tableau d\'honneur (12-14,99)', count: stats.tableau_honneur, percent: formatNumber((stats.tableau_honneur / stats.total_eleves) * 100) + '%' },
+                { label: 'Passable (10-11,99)', count: stats.passable, percent: formatNumber((stats.passable / stats.total_eleves) * 100) + '%' },
+                { label: 'Insuffisant (< 10)', count: stats.insuffisant, percent: formatNumber((stats.insuffisant / stats.total_eleves) * 100) + '%' }
+            ];
+            
+            mentionData.forEach((row, i) => {
+                // Fond alterné pour les lignes
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.text(String(row.count), pageWidth / 2, currentY + 5, { align: 'center' });
+                doc.text(row.percent, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // 4. Répartition par appréciations
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(13, 71, 161);
+            doc.setFontSize(12);
+            doc.text('Répartition par observations du conseil', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Observation', margin + 5, currentY + 10);
+            doc.text('Nombre', pageWidth / 2, currentY + 10, { align: 'center' });
+            doc.text('Pourcentage', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Lignes du tableau pour les observations
+            const observationData = [
+                { label: 'Satisfait doit continuer', count: stats.doit_continuer || 0, percent: formatNumber(((stats.doit_continuer || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Peut mieux faire', count: stats.mieux_faire || 0, percent: formatNumber(((stats.mieux_faire || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Risque de redoubler', count: stats.risque_redoubler || 0, percent: formatNumber(((stats.risque_redoubler || 0) / stats.total_eleves) * 100) + '%' }
+            ];
+            
+            currentY += 13;
+            observationData.forEach((row, i) => {
+                // Fond alterné pour les lignes
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.text(String(row.count), pageWidth / 2, currentY + 5, { align: 'center' });
+                doc.text(row.percent, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // Pied de page
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`© LCAMS ${new Date().getFullYear()} - Rapport généré le ${date}`, pageWidth / 2, 285, { align: 'center' });
+            
+            // Téléchargement du PDF
+            let filename = `LCAMS_Rapport_Moyennes_S1`;
+            if (filter.niveau) filename += `_${filter.niveau.replace(/\s+/g, '_')}`;
+            if (filter.classe) filename += `_${filter.classe.replace(/\s+/g, '_')}`;
+            filename += `_${new Date().toISOString().slice(0, 10)}.pdf`;
+            
+            doc.save(filename);
+            
+            // Supprimer la notification de chargement
+            document.body.removeChild(notification);
+            
+        } catch (error) {
+            console.error('Erreur lors de la génération du PDF:', error);
+            alert('Une erreur est survenue lors de la génération du PDF. Veuillez réessayer.');
+            document.body.querySelector('.alert').remove();
+        }
+    }
+    
+    // Fonction pour formater les nombres
+    function formatNumber(num) {
+        if (isNaN(num)) return '0';
+        return parseFloat(num).toFixed(1).replace('.0', '');
+    }
+});
+</script>
+{% endblock %}

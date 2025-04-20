@@ -44,6 +44,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Pour les liens de la sidebar (si elle existe)
     const sidebarLinks = document.querySelectorAll('.sidebar .list-group-item');
+    // D'abord, retirer la classe active de tous les liens
+    sidebarLinks.forEach(link => link.classList.remove('active'));
+    // Puis, n'activer que le lien correspondant à la page courante
     sidebarLinks.forEach(link => {
         const href = link.getAttribute('href');
         if (href && (currentLocation.startsWith(href) || window.location.href.includes(href))) {

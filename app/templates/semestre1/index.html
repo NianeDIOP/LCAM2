@@ -4,92 +4,94 @@
 {% set title = 'Semestre 1' %}
 
 {% block sidebar_content %}
-    <a href="{{ url_for('semestre1.index', tab='overview') }}" class="list-group-item {% if active_tab == 'overview' %}active{% endif %}">
-        <i class="fas fa-chart-pie"></i> Vue d'ensemble
+    <a href="#tab-overview" class="list-group-item{% if not active_tab or active_tab == 'overview' %} active{% endif %}" data-tab-target="tab-overview">
+        <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
     </a>
-    <a href="{{ url_for('semestre1.index', tab='moyennes') }}" class="list-group-item {% if active_tab == 'moyennes' %}active{% endif %}">
-        <i class="fas fa-chart-line"></i> Analyse des moyennes
+    <a href="{{ url_for('semestre1.moyennes_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.moyennes_analysis' %} active{% endif %}">
+        <i class="fas fa-chart-line me-2"></i> Analyse des moyennes
     </a>
-    <a href="{{ url_for('semestre1.index', tab='disciplines') }}" class="list-group-item {% if active_tab == 'disciplines' %}active{% endif %}">
-        <i class="fas fa-book"></i> Analyse par discipline
+    <a href="{{ url_for('semestre1.discipline_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.discipline_analysis' %} active{% endif %}">
+        <i class="fas fa-leaf me-2"></i> Analyse par discipline
     </a>
-    <a href="{{ url_for('semestre1.index', tab='reports') }}" class="list-group-item {% if active_tab == 'reports' %}active{% endif %}">
-        <i class="fas fa-file-alt"></i> Rapports
+    <a href="{{ url_for('semestre1.report') }}" class="list-group-item{% if request.endpoint == 'semestre1.report' %} active{% endif %}">
+        <i class="fas fa-file-alt me-2"></i> Rapports
     </a>
-    <a href="{{ url_for('semestre1.index', tab='import') }}" class="list-group-item {% if active_tab == 'import' %}active{% endif %}">
-        <i class="fas fa-upload"></i> Importation
+    <a href="#tab-import" class="list-group-item{% if active_tab == 'import' %} active{% endif %}" data-tab-target="tab-import">
+        <i class="fas fa-upload me-2"></i> Importation
     </a>
-    <div class="mt-4 px-3">
+    <div class="mt-auto p-3">
         <hr class="border-white opacity-25">
         <a href="{{ url_for('main.index') }}" class="list-group-item">
-            <i class="fas fa-home"></i> Accueil
+            <i class="fas fa-home me-2"></i> Accueil
         </a>
         <a href="{{ url_for('admin.index') }}" class="list-group-item">
-            <i class="fas fa-cog"></i> Paramètres
+            <i class="fas fa-cog me-2"></i> Paramètres
         </a>
     </div>
 {% endblock %}
 
 {% block main_content %}
-{%- if active_tab == 'overview' -%}
-    <div class="page-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="page-title">Vue d'ensemble</h1>
-            <p>{{ annee_scolaire }}</p>
-        </div>
-        <div>
-            <select class="form-select form-select-sm" id="annee-selector">
-                <option selected>{{ annee_scolaire }}</option>
-            </select>
-        </div>
-    </div>
+<div class="container-fluid">
+    <div class="tab-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="tab-overview" role="tabpanel">
+            <div class="page-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="page-title">Vue d'ensemble</h1>
+                    <p class="text-muted">{{ annee_scolaire }}</p>
+                </div>
+                <div>
+                    <select class="form-select form-select-sm" id="annee-selector">
+                        <option selected>{{ annee_scolaire }}</option>
+                        {# Add other years if available #}
+                    </select>
+                </div>
+            </div>
 
-    <!-- Statistiques générales -->
-    <div class="row mb-4">
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="icon text-primary mb-3">
-                    <i class="fas fa-user-graduate fa-2x"></i>
+            <!-- Statistiques générales -->
+            <div class="row g-2 mb-3">
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card h-100">
+                        <div class="icon text-primary mb-2">
+                            <i class="fas fa-user-graduate fa-2x"></i>
+                        </div>
+                        <div class="value">{{ stats.total_eleves }}</div>
+                        <div class="label">Élèves évalués</div>
+                    </div>
                 </div>
-                <div class="value text-primary">{{ stats.total_eleves }}</div>
-                <div class="label">Élèves évalués</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="icon text-info mb-3">
-                    <i class="fas fa-calculator fa-2x"></i>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card h-100">
+                        <div class="icon text-info mb-2">
+                            <i class="fas fa-calculator fa-2x"></i>
+                        </div>
+                        <div class="value">{{ stats.moyenne_generale | round(2) }}</div>
+                        <div class="label">Moyenne générale</div>
+                    </div>
                 </div>
-                <div class="value text-info">{{ stats.moyenne_generale }}</div>
-                <div class="label">Moyenne générale</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="icon text-success mb-3">
-                    <i class="fas fa-check-circle fa-2x"></i>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card h-100">
+                        <div class="icon text-success mb-2">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                        <div class="value">{{ stats.eleves_moyenne }}</div>
+                        <div class="label">Élèves ≥ 10</div>
+                    </div>
                 </div>
-                <div class="value text-success">{{ stats.eleves_moyenne }}</div>
-                <div class="label">Élèves ≥ 10</div>
-            </div>
-        </div>
-        <div class="col-md-3 mb-3">
-            <div class="stat-card">
-                <div class="icon text-warning mb-3">
-                    <i class="fas fa-award fa-2x"></i>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card h-100">
+                        <div class="icon text-warning mb-2">
+                            <i class="fas fa-award fa-2x"></i>
+                        </div>
+                        <div class="value">{{ stats.taux_reussite | round(2) }}%</div>
+                        <div class="label">Taux de réussite</div>
+                    </div>
                 </div>
-                <div class="value text-warning">{{ stats.taux_reussite }}%</div>
-                <div class="label">Taux de réussite</div>
             </div>
-        </div>
-    </div>
 
-    <!-- Performance par niveau -->
-    <div class="row mb-4">
-        <div class="col-12">
+            <!-- Performance par niveau -->
             <div class="card">
                 <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-layer-group me-2"></i>Performance par niveau</h5>
+                    <h5 class="card-title mb-0"><i class="fas fa-layer-group me-2"></i>Performance par niveau</h5>
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
@@ -97,10 +99,10 @@
                             <thead>
                                 <tr>
                                     <th>Niveau</th>
-                                    <th>Nombre d'élèves</th>
-                                    <th>Moyenne générale</th>
-                                    <th>Élèves ≥ 10</th>
-                                    <th>Taux de réussite (%)</th>
+                                    <th class="text-end">Nombre d'élèves</th>
+                                    <th class="text-end">Moyenne générale</th>
+                                    <th class="text-end">Élèves ≥ 10</th>
+                                    <th class="text-end">Taux de réussite (%)</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -108,15 +110,15 @@
                                     {% for ns in niveau_stats %}
                                         <tr>
                                             <td>{{ ns.niveau }}</td>
-                                            <td>{{ ns.nb_eleves }}</td>
-                                            <td>{{ ns.moyenne }}</td>
-                                            <td>{{ ns.nb_moyenne }}</td>
-                                            <td>{{ ns.taux_reussite }}</td>
+                                            <td class="text-end">{{ ns.nb_eleves }}</td>
+                                            <td class="text-end">{{ ns.moyenne | round(2) }}</td>
+                                            <td class="text-end">{{ ns.nb_moyenne }}</td>
+                                            <td class="text-end">{{ ns.taux_reussite | round(2) }}</td>
                                         </tr>
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="5" class="text-center">Aucune donnée disponible</td>
+                                        <td colspan="5" class="text-center text-muted py-4">Aucune donnée disponible</td>
                                     </tr>
                                 {% endif %}
                             </tbody>
@@ -125,773 +127,933 @@
                 </div>
             </div>
         </div>
-    </div>
-{%- elif active_tab == 'moyennes' -%}
-    {# Include the standalone Analyse des moyennes template with sidebar #}
-    {% include 'semestre1/moyennes_analysis.html' %}
-{%- elif active_tab == 'disciplines' -%}
-    <div class="page-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="page-title">Analyse par discipline</h1>
-            <p>Performance par matière</p>
-        </div>
-        <div>
-            <button class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-chart-bar me-1"></i> Graphiques
-            </button>
-        </div>
-    </div>
 
-    <!-- Filtre -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="card-title"><i class="fas fa-filter me-2"></i>Filtrer les données</h5>
-        </div>
-        <div class="card-body">
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <label for="niveauDiscipline" class="form-label">Niveau</label>
-                    <select class="form-select" id="niveauDiscipline" name="niveau_id">
-                        <option value="">Tous les niveaux</option>
-                        {% for niveau in niveaux %}
-                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="classeDiscipline" class="form-label">Classe</label>
-                    <select class="form-select" id="classeDiscipline" name="classe_id" disabled>
-                        <option value="">Sélectionner un niveau d'abord</option>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="discipline" class="form-label">Discipline</label>
-                    <select class="form-select" id="discipline" name="discipline_id" disabled>
-                        <option value="">Sélectionner une classe d'abord</option>
-                    </select>
-                </div>
-                <div class="col-12 text-end">
-                    <button type="button" class="btn btn-primary" id="btnFiltrerDisciplines">
-                        <i class="fas fa-search me-2"></i>Filtrer
-                    </button>
-                </div>
+        <!-- Reports Tab -->
+        <div class="tab-pane fade" id="tab-reports" role="tabpanel">
+            <div class="page-header">
+                <h1 class="page-title">Rapports</h1>
+                <p class="text-muted">Générer des rapports personnalisés</p>
             </div>
-        </div>
-    </div>
-
-    <!-- Zone des résultats de filtrage -->
-    <div id="disciplinesStats" class="mb-4">
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle me-2"></i>
-            Veuillez sélectionner un niveau, une classe et une discipline pour afficher les statistiques
-        </div>
-    </div>
-
-    <!-- Visualisations -->
-    <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-book-open me-2"></i>Performance par Discipline</h5>
-                </div>
-                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
-                    <div class="icon text-primary mb-3">
-                        <i class="fas fa-book-open fa-3x"></i>
-                    </div>
-                    <p>Sélectionnez des filtres pour afficher les performances par discipline</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 mb-4">
-            <div class="card h-100">
-                <div class="card-header">
-                    <h5 class="card-title"><i class="fas fa-balance-scale me-2"></i>Comparaison entre Disciplines</h5>
-                </div>
-                <div class="card-body text-center d-flex flex-column align-items-center justify-content-center">
-                    <div class="icon text-info mb-3">
-                        <i class="fas fa-balance-scale fa-3x"></i>
-                    </div>
-                    <p>Sélectionnez des filtres pour afficher la comparaison entre disciplines</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Tableau des résultats -->
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="card-title"><i class="fas fa-table me-2"></i>Résultats par Discipline</h5>
-            <div>
-                <button type="button" class="btn btn-sm btn-outline-secondary me-2">
-                    <i class="fas fa-print me-1"></i> Imprimer
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-success">
-                    <i class="fas fa-file-excel me-1"></i> Exporter Excel
-                </button>
-            </div>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Discipline</th>
-                            <th>Moyenne Générale</th>
-                            <th>Minimum</th>
-                            <th>Maximum</th>
-                            <th>≥ 10/20</th>
-                            <th>< 10/20</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td colspan="7" class="text-center py-4">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Sélectionnez des filtres pour afficher les résultats par discipline
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-{%- elif active_tab == 'reports' -%}
-    <div class="page-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="page-title">Rapports</h1>
-            <p>Bulletins et récapitulatifs</p>
-        </div>
-        <div>
-            <button class="btn btn-sm btn-outline-primary">
-                <i class="fas fa-print me-1"></i> Imprimer
-            </button>
-        </div>
-    </div>
-
-    <!-- Types de rapports -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h5 class="card-title"><i class="fas fa-file-alt me-2"></i>Sélectionner un type de rapport</h5>
-        </div>
-        <div class="card-body">
             <div class="row">
-                <div class="col-md-3 mb-3">
-                    <div class="card h-100 border shadow-sm">
-                        <div class="card-body text-center p-4">
-                            <div class="icon text-primary mb-3">
-                                <i class="fas fa-chalkboard-teacher fa-3x"></i>
-                            </div>
-                            <h5>Rapport de classe</h5>
-                            <p class="small text-muted mb-3">Statistiques complètes pour une classe spécifique</p>
-                            <button type="button" class="btn btn-primary btn-sm px-4">Sélectionner</button>
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="fas fa-table me-2"></i>Rapports par classe</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>Générer un rapport détaillé pour une classe spécifique.</p>
+                            <form id="classeReportForm">
+                                <div class="mb-3">
+                                    <label for="niveauRapport" class="form-label">Niveau</label>
+                                    <select class="form-select form-select-sm" id="niveauRapport" name="niveau_id">
+                                        <option value="">Sélectionner un niveau</option>
+                                        {% for niveau in niveaux %}
+                                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="classeRapport" class="form-label">Classe</label>
+                                    <select class="form-select form-select-sm" id="classeRapport" name="classe_id" disabled>
+                                        <option value="">Sélectionner une classe</option>
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnGenererRapportClasse">
+                                    <i class="fas fa-file-export me-1"></i> Générer
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card h-100 border shadow-sm">
-                        <div class="card-body text-center p-4">
-                            <div class="icon text-success mb-3">
-                                <i class="fas fa-book fa-3x"></i>
-                            </div>
-                            <h5>Rapport par discipline</h5>
-                            <p class="small text-muted mb-3">Analyse détaillée d'une discipline particulière</p>
-                            <button type="button" class="btn btn-success btn-sm px-4">Sélectionner</button>
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="fas fa-medal me-2"></i>Tableau d'honneur</h5>
                         </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card h-100 border shadow-sm">
-                        <div class="card-body text-center p-4">
-                            <div class="icon text-warning mb-3">
-                                <i class="fas fa-trophy fa-3x"></i>
-                            </div>
-                            <h5>Tableau d'honneur</h5>
-                            <p class="small text-muted mb-3">Liste des meilleurs élèves par classe ou niveau</p>
-                            <button type="button" class="btn btn-warning btn-sm px-4">Sélectionner</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3 mb-3">
-                    <div class="card h-100 border shadow-sm">
-                        <div class="card-body text-center p-4">
-                            <div class="icon text-info mb-3">
-                                <i class="fas fa-chart-pie fa-3x"></i>
-                            </div>
-                            <h5>Rapport statistique global</h5>
-                            <p class="small text-muted mb-3">Statistiques générales pour l'établissement</p>
-                            <button type="button" class="btn btn-info btn-sm px-4">Sélectionner</button>
+                        <div class="card-body">
+                            <p>Générer un tableau d'honneur des meilleurs élèves.</p>
+                            <form id="tableauHonneurForm">
+                                <div class="mb-3">
+                                    <label for="niveauTableau" class="form-label">Niveau</label>
+                                    <select class="form-select form-select-sm" id="niveauTableau" name="niveau_id">
+                                        <option value="all">Tous les niveaux</option>
+                                        {% for niveau in niveaux %}
+                                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="limitTableau" class="form-label">Nombre d'élèves</label>
+                                    <input type="number" class="form-control form-control-sm" id="limitTableau" name="limit" min="5" max="50" value="10">
+                                </div>
+                                <button type="button" class="btn btn-primary btn-sm" id="btnGenererTableauHonneur">
+                                    <i class="fas fa-trophy me-1"></i> Générer
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Information -->
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
-        Veuillez sélectionner un type de rapport pour continuer
-    </div>
-{%- elif active_tab == 'import' -%}
-    <div class="page-header d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="page-title">Importation</h1>
-            <p>Données du semestre 1</p>
-        </div>
-        <div>
-            <a href="#" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#importHelpModal">
-                <i class="fas fa-question-circle me-1"></i> Aide
-            </a>
-        </div>
-    </div>
-
-    <!-- Étapes d'importation -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="import-steps d-flex justify-content-between position-relative mb-5">
-                <!-- Ligne de connexion -->
-                <div class="import-line position-absolute" style="top: 25px; left: 50px; right: 50px; height: 2px; background-color: #e9ecef; z-index: 0;"></div>
-                
-                <!-- Étapes -->
-                <div class="step-item text-center position-relative" style="z-index: 1;">
-                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
-                         style="width: 50px; height: 50px; border-radius: 50%; background-color: var(--primary); color: white;">
-                        <i class="fas fa-check"></i>
+        <!-- Import Tab -->
+        <div class="tab-pane fade" id="tab-import" role="tabpanel">
+            <div class="page-header">
+                <h1 class="page-title">Importation des données</h1>
+                <p class="text-muted">Importer les moyennes et les données des élèves</p>
+            </div>
+            <div class="row">
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="fas fa-file-excel me-2"></i>Importer des données</h5>
+                        </div>
+                        <div class="card-body">
+                            <form action="{{ url_for('semestre1.import_data') }}" method="post" enctype="multipart/form-data">
+                                <div class="mb-3">
+                                    <label for="niveauImport" class="form-label">Niveau</label>
+                                    <select class="form-select form-select-sm" id="niveauImport" name="niveau_id" required>
+                                        <option value="">Sélectionner un niveau</option>
+                                        {% for niveau in niveaux %}
+                                            <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="classeImport" class="form-label">Classe</label>
+                                    <select class="form-select form-select-sm" id="classeImport" name="classe_id" disabled required>
+                                        <option value="">Sélectionner une classe</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="fileImport" class="form-label">Fichier Excel</label>
+                                    <input type="file" class="form-control form-control-sm" id="fileImport" name="file" accept=".xlsx" required>
+                                    <div class="form-text">Format accepté: Excel (.xlsx)</div>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-upload me-1"></i> Importer
+                                </button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="step-label">Sélection</div>
                 </div>
-                
-                <div class="step-item text-center position-relative" style="z-index: 1;">
-                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
-                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
-                        2
+                <div class="col-md-6 mb-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0"><i class="fas fa-history me-2"></i>Historique des imports</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            <!-- Ajout du bouton d'export PDF -->
+                            <div class="d-flex justify-content-end p-2">
+                                <button type="button" class="btn btn-sm btn-primary" id="btnExportImportHistoryPDF">
+                                    <i class="fas fa-file-pdf me-1"></i> Exporter en PDF
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0" id="tableImportHistory">
+                                    <thead>
+                                        <tr>
+                                            <th>Niveau</th>
+                                            <th>Classe</th>
+                                            <th class="text-end">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if imports %}
+                                            {% for imp in imports %}
+                                                <tr>
+                                                    <td>{{ imp.niveau }}</td>
+                                                    <td>{{ imp.classe }}</td>
+                                                    <td class="text-end">
+                                                        <button type="button" class="btn btn-sm btn-info view-classe-btn" data-classe-id="{{ imp.classe_id }}" data-niveau="{{ imp.niveau }}" data-classe="{{ imp.classe }}">
+                                                            <i class="fas fa-eye"></i>
+                                                        </button>
+                                                        <form action="{{ url_for('semestre1.delete_import') }}" method="post" class="d-inline">
+                                                            <input type="hidden" name="niveau_id" value="{{ imp.niveau_id }}">
+                                                            <input type="hidden" name="classe_id" value="{{ imp.classe_id }}">
+                                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Êtes-vous sûr de vouloir supprimer cet import ?')">
+                                                                <i class="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="3" class="text-center text-muted py-4">Aucun import effectué</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
-                    <div class="step-label">Import Excel</div>
-                </div>
-                
-                <div class="step-item text-center position-relative" style="z-index: 1;">
-                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
-                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
-                        3
-                    </div>
-                    <div class="step-label">Visualisation</div>
-                </div>
-                
-                <div class="step-item text-center position-relative" style="z-index: 1;">
-                    <div class="step-circle d-flex align-items-center justify-content-center mx-auto mb-2" 
-                         style="width: 50px; height: 50px; border-radius: 50%; background-color: #e9ecef; color: var(--gray-600);">
-                        4
-                    </div>
-                    <div class="step-label">Validation</div>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Formulaire d'importation -->
-    <form method="POST" action="{{ url_for('semestre1.import_data') }}" enctype="multipart/form-data">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title"><i class="fas fa-file-import me-2"></i>Importer des données</h5>
-            </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <label for="niveau_id" class="form-label">Niveau</label>
-                        <select id="niveau_id" name="niveau_id" class="form-select" required>
-                            <option value="">Sélectionner un niveau</option>
-                            {% for niv in niveaux %}
-                                <option value="{{ niv.id }}">{{ niv.libelle }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="classe_id" class="form-label">Classe</label>
-                        <select id="classe_id" name="classe_id" class="form-select" required disabled>
-                            <option value="">Sélectionner un niveau d'abord</option>
-                        </select>
-                    </div>
-                    
-                    <div class="col-12">
-                        <label for="file" class="form-label">Fichier Excel (.xlsx)</label>
-                        <input type="file" id="file" name="file" class="form-control" accept=".xlsx" required>
-                        <div class="form-text">Le fichier doit contenir les feuilles "Moyennes eleves" et "Données détaillées"</div>
-                    </div>
-                    
-                    <div class="col-12 text-end">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-upload me-2"></i>Importer
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
-
-    <!-- Historique des imports -->
-    <div id="import-history" class="card">
-        <div class="card-header">
-            <h5 class="card-title"><i class="fas fa-history me-2"></i>Historique des imports</h5>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead>
-                        <tr>
-                            <th>Niveau</th>
-                            <th>Classe</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if imports %}
-                            {% for imp in imports %}
-                                <tr>
-                                    <td>{{ imp.niveau }}</td>
-                                    <td>{{ imp.classe }}</td>
-                                    <td>
-                                        <form method="POST" action="{{ url_for('semestre1.delete_import') }}" class="d-inline-block">
-                                            <input type="hidden" name="niveau_id" value="{{ imp.niveau_id }}">
-                                            <input type="hidden" name="classe_id" value="{{ imp.classe_id }}">
-                                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirmAction('Êtes-vous sûr de vouloir supprimer cet import ?');">
-                                                <i class="fas fa-trash-alt me-1"></i> Supprimer
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr></tr>
-                                <td colspan="3" class="text-center py-4">
-                                    <i class="fas fa-info-circle me-2"></i>
-                                    Aucun import enregistré
-                                </td>
-                            </tr>
-                        {% endif %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-{%- endif -%}
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Créer les graphiques
-        createCharts();
-        
-        // Gérer les interactions des filtres
-        setupFilters();
-        
-        // setupTabs removed to allow full page reload for sidebar links
+    // Définir les endpoints d'API pour les fonctions du script
+    window.apiEndpoints = {
+        getClasses: '/semestre1/api/classes/',
+        getDisciplines: '/semestre1/api/disciplines/',
+        statsMoyennes: '/semestre1/api/stats/moyennes',
+        statsDiscipline: '/semestre1/api/stats/discipline'
+    };
 
-        // Auto-trigger filters for analysis tabs based on ?tab query param
-        const urlParams = new URLSearchParams(window.location.search);
-        const activeTabParam = urlParams.get('tab') || 'overview';
-        if (activeTabParam === 'moyennes') {
-            document.getElementById('btnFiltrerMoyennes')?.click();
-        }
-        if (activeTabParam === 'disciplines') {
-            document.getElementById('btnFiltrerDisciplines')?.click();
-        }
-        // If landing with #import-history hash, scroll to history
-        if (window.location.hash === '#import-history') {
-            // Activer l'onglet import
-            const tabLink = document.querySelector('.list-group-item[href*="tab=import"]');
-            if (tabLink) {
-                tabLink.click();
+    document.addEventListener('DOMContentLoaded', function() {
+        // Activer les onglets avec notre propre script (plus fiable que Bootstrap)
+        function setupTabs() {
+            const tabLinks = document.querySelectorAll('.sidebar .list-group-item[data-tab-target]');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            
+            // Fonction pour activer un onglet
+            function activateTab(tabId) {
+                // Désactiver tous les onglets
+                tabLinks.forEach(link => link.classList.remove('active'));
+                tabPanes.forEach(pane => {
+                    pane.classList.remove('show', 'active');
+                });
+                
+                // Activer l'onglet demandé
+                const activeLink = document.querySelector(`.sidebar .list-group-item[data-tab-target="${tabId}"]`);
+                const activePane = document.getElementById(tabId);
+                
+                if (activeLink && activePane) {
+                    activeLink.classList.add('active');
+                    activePane.classList.add('show', 'active');
+                }
             }
             
-            // Après un court délai pour laisser le temps à l'onglet de s'afficher, scroller vers l'historique
-            setTimeout(function() {
-                const historyElement = document.getElementById('import-history');
-                if (historyElement) {
-                    historyElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            }, 300);
-        }
-    });
-    
-    // Créer les graphiques
-    function createCharts() {
-        // Créer le graphique des moyennes par niveau
-        const moyennesNiveauCtx = document.getElementById('moyennesNiveauChart');
-        if (moyennesNiveauCtx) {
-            // Extraire les données des attributs data (si définis) ou utiliser des valeurs par défaut
-            const labels = moyennesNiveauCtx.getAttribute('data-labels') ? 
-                JSON.parse(moyennesNiveauCtx.getAttribute('data-labels')) : 
-                [{% for ns in niveau_stats %}'{{ ns.niveau }}',{% endfor %}];
-            
-            const values = moyennesNiveauCtx.getAttribute('data-values') ? 
-                JSON.parse(moyennesNiveauCtx.getAttribute('data-values')) : 
-                [{% for ns in niveau_stats %}{{ ns.moyenne }},{% endfor %}];
-            
-            // Créer le graphique
-            new Chart(moyennesNiveauCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Moyenne générale',
-                        data: values,
-                        backgroundColor: 'rgba(94, 53, 177, 0.7)',
-                        borderColor: 'rgba(94, 53, 177, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 20
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
-                    }
-                }
+            // Ajouter les écouteurs d'événements aux liens de la barre latérale
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const tabId = this.getAttribute('data-tab-target');
+                    activateTab(tabId);
+                    // Mettre à jour l'URL mais sans recharger la page
+                    history.pushState(null, '', this.getAttribute('href'));
+                });
             });
+            
+            // Activer l'onglet basé sur le hash de l'URL au chargement
+            if (window.location.hash) {
+                const tabId = window.location.hash.substring(1);
+                activateTab(tabId);
+            }
         }
         
-        // Créer le graphique des taux de réussite par niveau
-        const tauxReussiteCtx = document.getElementById('tauxReussiteChart');
-        if (tauxReussiteCtx) {
-            // Extraire les données des attributs data (si définis) ou utiliser des valeurs par défaut
-            const labels = tauxReussiteCtx.getAttribute('data-labels') ? 
-                JSON.parse(tauxReussiteCtx.getAttribute('data-labels')) : 
-                [{% for ns in niveau_stats %}'{{ ns.niveau }}',{% endfor %}];
+        // Configurer les sélecteurs de niveau/classe pour toutes les sections
+        function setupSelectDependencies(niveauId, classeId) {
+            const niveauSelect = document.getElementById(niveauId);
+            const classeSelect = document.getElementById(classeId);
             
-            const values = tauxReussiteCtx.getAttribute('data-values') ? 
-                JSON.parse(tauxReussiteCtx.getAttribute('data-values')) : 
-                [{% for ns in niveau_stats %}{{ ns.taux_reussite }},{% endfor %}];
-            
-            // Créer le graphique
-            new Chart(tauxReussiteCtx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Taux de réussite (%)',
-                        data: values,
-                        backgroundColor: 'rgba(46, 204, 113, 0.7)',
-                        borderColor: 'rgba(46, 204, 113, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100
-                        }
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
+            if (niveauSelect && classeSelect) {
+                niveauSelect.addEventListener('change', function() {
+                    const selectedNiveauId = this.value;
+                    classeSelect.disabled = true;
+                    classeSelect.innerHTML = '<option value="">Chargement...</option>';
+                    
+                    if (!selectedNiveauId) {
+                        classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
+                        classeSelect.disabled = true;
+                        return;
                     }
-                }
-            });
+                    
+                    fetch(`${window.apiEndpoints.getClasses}${selectedNiveauId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
+                            data.forEach(classe => {
+                                const option = document.createElement('option');
+                                option.value = classe.id;
+                                option.textContent = classe.libelle;
+                                classeSelect.appendChild(option);
+                            });
+                            classeSelect.disabled = false;
+                        })
+                        .catch(error => {
+                            console.error('Erreur:', error);
+                            classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                            classeSelect.disabled = true;
+                        });
+                });
+            }
         }
-    }
-    
-    // Configurer les filtres
-    function setupFilters() {
-        // Gestion des sélects dépendants niveau/classe
-        setupNiveauClasseSelects('niveau', 'classe');
-        setupNiveauClasseSelects('niveauDiscipline', 'classeDiscipline');
-        setupNiveauClasseSelects('niveau_id', 'classe_id');
         
-        // Gestion des sélects dépendants classe/discipline
+        // Configurer les sélecteurs de classe/discipline
+        function setupClasseDisciplineSelects(classeId, disciplineId) {
+            const classeSelect = document.getElementById(classeId);
+            const disciplineSelect = document.getElementById(disciplineId);
+            
+            if (classeSelect && disciplineSelect) {
+                classeSelect.addEventListener('change', function() {
+                    const selectedClasseId = this.value;
+                    disciplineSelect.disabled = true;
+                    disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+                    
+                    if (!selectedClasseId) {
+                        disciplineSelect.innerHTML = '<option value="">Sélectionner une classe d\'abord</option>';
+                        disciplineSelect.disabled = true;
+                        return;
+                    }
+                    
+                    // Appeler l'API pour récupérer les disciplines de la classe sélectionnée
+                    fetch(`${window.apiEndpoints.getDisciplines}${selectedClasseId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            disciplineSelect.innerHTML = '<option value="">Sélectionner une discipline</option>';
+                            if (data && data.length > 0) {
+                                data.forEach(discipline => {
+                                    const option = document.createElement('option');
+                                    option.value = discipline.id;
+                                    option.textContent = discipline.libelle;
+                                    disciplineSelect.appendChild(option);
+                                });
+                                disciplineSelect.disabled = false;
+                            } else {
+                                disciplineSelect.innerHTML = '<option value="">Aucune discipline disponible</option>';
+                                disciplineSelect.disabled = true;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Erreur lors du chargement des disciplines:', error);
+                            disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                            disciplineSelect.disabled = true;
+                        });
+                });
+            }
+        }
+        
+        // Configurer les filtres pour chaque section
+        setupSelectDependencies('niveauDiscipline', 'classeDiscipline');
         setupClasseDisciplineSelects('classeDiscipline', 'discipline');
+        setupSelectDependencies('niveauRapport', 'classeRapport');
+        setupSelectDependencies('niveauImport', 'classeImport');
         
-        // Gestion du bouton de filtrage des moyennes
-        const btnFiltrerMoyennes = document.getElementById('btnFiltrerMoyennes');
-        if (btnFiltrerMoyennes) {
-            btnFiltrerMoyennes.addEventListener('click', function() {
-                filtrerMoyennes();
-            });
-        }
-        
-        // Gestion du bouton de filtrage des disciplines
+        // Fonction pour filtrer les disciplines
         const btnFiltrerDisciplines = document.getElementById('btnFiltrerDisciplines');
         if (btnFiltrerDisciplines) {
-            btnFiltrerDisciplines.addEventListener('click', function() {
-                filtrerDisciplines();
-            });
+            btnFiltrerDisciplines.addEventListener('click', filtrerDisciplines);
         }
-    }
-    
-    // Configurer les sélects dépendants niveau/classe
-    function setupNiveauClasseSelects(niveauId, classeId) {
-        const niveauSelect = document.getElementById(niveauId);
-        const classeSelect = document.getElementById(classeId);
         
-        if (niveauSelect && classeSelect) {
-            niveauSelect.addEventListener('change', function() {
-                const niveauId = this.value;
-                
-                if (!niveauId) {
-                    classeSelect.innerHTML = '<option value="">Sélectionner un niveau d\'abord</option>';
-                    classeSelect.disabled = true;
-                    return;
-                }
-                
-                classeSelect.disabled = true;
-                classeSelect.innerHTML = '<option value="">Chargement...</option>';
-                
-                fetch(`{{ url_for('semestre1.get_classes', niveau_id=0) }}`.replace('0', niveauId))
-                    .then(response => response.json())
-                    .then(data => {
-                        classeSelect.innerHTML = '<option value="">Sélectionner une classe</option>';
-                        
-                        data.forEach(classe => {
-                            const option = document.createElement('option');
-                            option.value = classe.id;
-                            option.textContent = classe.libelle;
-                            classeSelect.appendChild(option);
-                        });
-                        
-                        classeSelect.disabled = false;
-                    })
-                    .catch(error => {
-                        console.error('Erreur lors du chargement des classes:', error);
-                        classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
-                        classeSelect.disabled = false;
-                    });
-            });
-        }
-    }
-    
-    // Configurer les sélects dépendants classe/discipline
-    function setupClasseDisciplineSelects(classeId, disciplineId) {
-        const classeSelect = document.getElementById(classeId);
-        const disciplineSelect = document.getElementById(disciplineId);
-        
-        if (classeSelect && disciplineSelect) {
-            classeSelect.addEventListener('change', function() {
-                const classeId = this.value;
-                
+        // Fonction pour générer un rapport de classe
+        const btnGenererRapportClasse = document.getElementById('btnGenererRapportClasse');
+        if (btnGenererRapportClasse) {
+            btnGenererRapportClasse.addEventListener('click', function() {
+                const classeId = document.getElementById('classeRapport').value;
                 if (!classeId) {
-                    disciplineSelect.innerHTML = '<option value="">Sélectionner une classe d\'abord</option>';
-                    disciplineSelect.disabled = true;
+                    alert('Veuillez sélectionner une classe.');
                     return;
                 }
-                
-                disciplineSelect.disabled = true;
-                disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
-                
-                fetch(`{{ url_for('semestre1.get_disciplines', classe_id=0) }}`.replace('0', classeId))
-                    .then(response => response.json())
-                    .then(data => {
-                        disciplineSelect.innerHTML = '<option value="">Sélectionner une discipline</option>';
-                        
-                        data.forEach(discipline => {
-                            const option = document.createElement('option');
-                            option.value = discipline.id;
-                            option.textContent = discipline.libelle;
-                            disciplineSelect.appendChild(option);
-                        });
-                        
-                        disciplineSelect.disabled = false;
-                    })
-                    .catch(error => {
-                        console.error('Erreur lors du chargement des disciplines:', error);
-                        disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
-                        disciplineSelect.disabled = false;
-                    });
+                window.location.href = `/semestre1/rapport/classe/${classeId}`;
             });
         }
-    }
-    
-    // Filtrer les moyennes
-    function filtrerMoyennes() {
-        const classeId = document.getElementById('classe').value;
-        const moyennesStatsDiv = document.getElementById('moyennesStats');
         
-        if (!classeId) {
-            moyennesStatsDiv.innerHTML = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Veuillez sélectionner une classe pour afficher les statistiques
+        // Fonction pour générer un tableau d'honneur
+        const btnGenererTableauHonneur = document.getElementById('btnGenererTableauHonneur');
+        if (btnGenererTableauHonneur) {
+            btnGenererTableauHonneur.addEventListener('click', function() {
+                const niveauId = document.getElementById('niveauTableau').value;
+                const limit = document.getElementById('limitTableau').value;
+                window.location.href = `/semestre1/tableau-honneur?niveau_id=${niveauId}&limit=${limit}`;
+            });
+        }
+        
+        // Configurer les onglets
+        setupTabs();
+    });
+
+    function showLoading(element, message) {
+        if (element) {
+            element.innerHTML = `
+                <div class="d-flex justify-content-center p-3">
+                    <div class="spinner-border text-primary me-2" role="status"></div>
+                    <span>${message || 'Chargement...'}</span>
                 </div>
             `;
-            return;
         }
-        
-        // Afficher un indicateur de chargement
-        moyennesStatsDiv.innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-spinner fa-spin me-2"></i>
-                Chargement des données...
-            </div>
-        `;
-        
-        // Appeler l'API pour récupérer les statistiques
-        fetch(`{{ url_for('semestre1.stats_moyennes') }}?classe_id=${classeId}`)
-            .then(response => response.json())
-            .then(data => {
-                // Afficher les statistiques
-                moyennesStatsDiv.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-3 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-primary mb-3">
-                                    <i class="fas fa-user-graduate fa-2x"></i>
-                                </div>
-                                <div class="value text-primary">${data.total_eleves}</div>
-                                <div class="label">Élèves évalués</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-info mb-3">
-                                    <i class="fas fa-calculator fa-2x"></i>
-                                </div>
-                                <div class="value text-info">${data.moyenne_generale}</div>
-                                <div class="label">Moyenne générale</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-success mb-3">
-                                    <i class="fas fa-check-circle fa-2x"></i>
-                                </div>
-                                <div class="value text-success">${data.eleves_moyenne}</div>
-                                <div class="label">Élèves ≥ 10</div>
-                            </div>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-warning mb-3">
-                                    <i class="fas fa-award fa-2x"></i>
-                                </div>
-                                <div class="value text-warning">${data.taux_reussite}%</div>
-                                <div class="label">Taux de réussite</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            })
-            .catch(error => {
-                console.error('Erreur lors du chargement des statistiques:', error);
-                moyennesStatsDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        Erreur lors du chargement des données. Veuillez réessayer.
-                    </div>
-                `;
-            });
     }
-    
-    // Filtrer les disciplines
+
+    function formatNumber(number, decimals = 2) {
+        if (isNaN(number) || number === null) return '0,00';
+        return Number(number).toFixed(decimals).replace('.', ',');
+    }
+
+    // Fonction pour filtrer les disciplines (exemple)
     function filtrerDisciplines() {
-        const classeId = document.getElementById('classeDiscipline').value;
-        const disciplineId = document.getElementById('discipline').value;
-        const disciplinesStatsDiv = document.getElementById('disciplinesStats');
-        
-        if (!classeId || !disciplineId) {
-            disciplinesStatsDiv.innerHTML = `
+        const form = document.getElementById('filterDisciplinesForm');
+        const niveauId = form.querySelector('#niveauDiscipline').value;
+        const classeId = form.querySelector('#classeDiscipline').value;
+        const disciplineId = form.querySelector('#discipline').value;
+        const resultsContainer = document.getElementById('disciplinesStats');
+
+        if (!niveauId || !classeId || !disciplineId) {
+            resultsContainer.innerHTML = `
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    Veuillez sélectionner une classe et une discipline pour afficher les statistiques
-                </div>
-            `;
+                    Veuillez sélectionner un niveau, une classe ET une discipline.
+                </div>`;
             return;
         }
-        
-        // Afficher un indicateur de chargement
-        disciplinesStatsDiv.innerHTML = `
-            <div class="alert alert-info">
-                <i class="fas fa-spinner fa-spin me-2"></i>
-                Chargement des données...
-            </div>
-        `;
-        
-        // Appeler l'API pour récupérer les statistiques
-        fetch(`{{ url_for('semestre1.stats_discipline') }}?classe_id=${classeId}&discipline_id=${disciplineId}`)
-            .then(response => response.json())
+
+        showLoading(resultsContainer, 'Chargement des statistiques de la discipline...');
+
+        // Construire l'URL de l'API (à adapter)
+        const apiUrl = `/semestre1/api/stats/discipline?niveau_id=${niveauId}&classe_id=${classeId}&discipline_id=${disciplineId}`;
+
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
-                // Afficher les statistiques
-                disciplinesStatsDiv.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-primary mb-3">
-                                    <i class="fas fa-user-graduate fa-2x"></i>
-                                </div>
-                                <div class="value text-primary">${data.nb_eleves}</div>
-                                <div class="label">Élèves</div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-info mb-3">
-                                    <i class="fas fa-calculator fa-2x"></i>
-                                </div>
-                                <div class="value text-info">${data.moyenne_discipline}</div>
-                                <div class="label">Moyenne</div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-success mb-3">
-                                    <i class="fas fa-check-circle fa-2x"></i>
-                                </div>
-                                <div class="value text-success">${data.nb_moyenne}</div>
-                                <div class="label">≥ 10</div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-warning mb-3">
-                                    <i class="fas fa-award fa-2x"></i>
-                                </div>
-                                <div class="value text-warning">${data.taux_reussite}%</div>
-                                <div class="label">Taux</div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-danger mb-3">
-                                    <i class="fas fa-arrow-down fa-2x"></i>
-                                </div>
-                                <div class="value text-danger">${data.min}</div>
-                                <div class="label">Min</div>
-                            </div>
-                        </div>
-                        <div class="col-md-2 mb-3">
-                            <div class="stat-card">
-                                <div class="icon text-primary mb-3">
-                                    <i class="fas fa-arrow-up fa-2x"></i>
-                                </div>
-                                <div class="value text-primary">${data.max}</div>
-                                <div class="label">Max</div>
-                            </div>
+                // Afficher les résultats (exemple simple)
+                resultsContainer.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Statistiques pour ${data.discipline_nom} en ${data.classe_nom} (${data.niveau_nom})</h5>
+                            <p>Moyenne de la classe: ${formatNumber(data.moyenne_classe)}</p>
+                            <p>Nombre d'élèves >= 10: ${data.nb_sup_10}</p>
+                            <p>Taux de réussite: ${formatNumber(data.taux_reussite)}%</p>
+                            <p>Meilleure note: ${formatNumber(data.max_note)}</p>
+                            <p>Moins bonne note: ${formatNumber(data.min_note)}</p>
+                            {# Ajoutez ici des graphiques ou tableaux plus détaillés #}
                         </div>
                     </div>
                 `;
+                // Ici, vous pourriez aussi appeler une fonction pour créer des graphiques avec Chart.js
             })
             .catch(error => {
-                console.error('Erreur lors du chargement des statistiques:', error);
-                disciplinesStatsDiv.innerHTML = `
+                console.error('Erreur lors de la récupération des stats disciplines:', error);
+                resultsContainer.innerHTML = `
                     <div class="alert alert-danger">
                         <i class="fas fa-exclamation-circle me-2"></i>
-                        Erreur lors du chargement des données. Veuillez réessayer.
-                    </div>
-                `;
+                        Erreur lors du chargement des statistiques. (${error.message})
+                    </div>`;
             });
     }
+
+    // Les fonctions setupCharts, setupFilters, showLoading, formatNumber etc. sont maintenant dans main.js
+    // Assurez-vous que main.js est chargé APRÈS ce script ou que ces fonctions sont globales.
+    // Si elles sont définies dans l'event DOMContentLoaded de main.js, elles ne seront pas globales.
+    // Il est préférable de les définir globalement ou de les passer en paramètre si nécessaire.
+
+</script>
+
+<!-- Modale pour afficher la liste des élèves - Version professionnelle -->
+<div class="modal fade" id="classeElevesModal" tabindex="-1" aria-labelledby="classeElevesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="classeElevesModalLabel">Liste des élèves</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body px-0 py-2">
+                <div class="mb-3 px-3">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 id="classeInfo" class="mb-0 fw-bold text-primary"></h6>
+                        <button type="button" class="btn btn-primary" id="btnExportPDF">
+                            <i class="fas fa-file-pdf me-1"></i> Exporter en PDF
+                        </button>
+                    </div>
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table id="elevesTable" class="table table-striped table-hover table-bordered mb-0 nowrap">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th class="sortable text-center" data-sort="rang" style="cursor: pointer; width: 50px;">Rang <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable" data-sort="prenom" style="cursor: pointer; width: 120px;">Prénom <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable" data-sort="nom" style="cursor: pointer; width: 120px;">Nom <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable text-center" data-sort="sexe" style="cursor: pointer; width: 80px;">Sexe <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable text-center" data-sort="moyenne" style="cursor: pointer; width: 80px;">Moyenne <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable" data-sort="appreciation" style="cursor: pointer; width: 150px;">Appréciation <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable" data-sort="observation" style="cursor: pointer; width: 150px;">Observation <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable text-center" data-sort="retard" style="cursor: pointer; width: 70px;">Retards <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable text-center" data-sort="absence" style="cursor: pointer; width: 70px;">Absences <i class="fas fa-sort ms-1"></i></th>
+                                            <th class="sortable text-center" data-sort="conseil_discipline" style="cursor: pointer; width: 60px;">C.D <i class="fas fa-sort ms-1"></i></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="elevesTableBody">
+                                        <tr>
+                                            <td colspan="10" class="text-center py-4">Chargement des données...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="classeStats" class="row g-3 mx-1">
+                    <!-- Les statistiques seront injectées ici par JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ajout de jspdf à la fin du fichier -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+    // Code pour la gestion de la modal et du tableau d'élèves
+    document.addEventListener('DOMContentLoaded', function() {
+        // Définir les endpoints API
+        window.apiEndpoints.getClasseEleves = '/semestre1/api/classe-eleves/';
+        
+        // Variables pour stocker les données actuelles
+        let currentElevesData = null;
+        let currentClasse = null;
+        let currentSortColumn = 'rang';
+        let currentSortDirection = 'asc';
+        
+        // Référence à la modal
+        const classeElevesModal = new bootstrap.Modal(document.getElementById('classeElevesModal'));
+        
+        // Récupérer tous les boutons "Voir" de la liste des imports
+        const viewButtons = document.querySelectorAll('.view-classe-btn');
+        viewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const classeId = this.getAttribute('data-classe-id');
+                const niveau = this.getAttribute('data-niveau');
+                const classe = this.getAttribute('data-classe');
+                
+                // Mettre à jour le titre de la modal
+                document.getElementById('classeElevesModalLabel').textContent = `Liste des élèves - ${classe}`;
+                document.getElementById('classeInfo').textContent = `Niveau: ${niveau} - Classe: ${classe}`;
+                
+                // Afficher un message de chargement
+                document.getElementById('elevesTableBody').innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                            Chargement des données...
+                        </td>
+                    </tr>
+                `;
+                
+                // Charger les données des élèves
+                fetchElevesData(classeId);
+                
+                // Ouvrir la modal
+                classeElevesModal.show();
+            });
+        });
+        
+        // Fonction pour récupérer les données des élèves
+        function fetchElevesData(classeId) {
+            fetch(`${window.apiEndpoints.getClasseEleves}${classeId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erreur HTTP! Statut: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Stocker les données pour utilisation ultérieure
+                    currentElevesData = data;
+                    currentClasse = data.classe;
+                    
+                    // Afficher les données dans le tableau
+                    renderElevesTable(data.eleves);
+                    
+                    // Afficher les statistiques
+                    renderClasseStats(data.statistiques);
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement des élèves:', error);
+                    document.getElementById('elevesTableBody').innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center text-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                Erreur lors du chargement des données: ${error.message}
+                            </td>
+                        </tr>
+                    `;
+                });
+        }
+        
+        // Fonction pour afficher le tableau des élèves avec abréviations
+        function renderElevesTable(eleves) {
+            // Trier les élèves selon la colonne et la direction actuelles
+            const sortedEleves = sortEleves(eleves, currentSortColumn, currentSortDirection);
+            
+            const tableBody = document.getElementById('elevesTableBody');
+            tableBody.innerHTML = '';
+            
+            if (sortedEleves.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="10" class="text-center">Aucun élève trouvé pour cette classe.</td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            sortedEleves.forEach(eleve => {
+                const row = document.createElement('tr');
+                
+                // Ajouter une classe selon si l'élève a la moyenne ou non
+                if (eleve.moyenne >= 10) {
+                    row.classList.add('table-success');
+                } else {
+                    row.classList.add('table-danger');
+                }
+                
+                // Tronquer les textes longs pour l'affichage dans le tableau
+                const truncate = (str, maxLength = 30) => {
+                    if (!str) return '-';
+                    return str.length > maxLength ? str.substring(0, maxLength) + '...' : str;
+                };
+                
+                // Formatage simplifié des données pour l'affichage
+                row.innerHTML = `
+                    <td class="text-center">${eleve.rang || '-'}</td>
+                    <td>${eleve.prenom || '-'}</td>
+                    <td>${eleve.nom || '-'}</td>
+                    <td class="text-center">${getSexeSimple(eleve.sexe)}</td>
+                    <td class="text-center fw-bold">${formatNumber(eleve.moyenne)}</td>
+                    <td class="text-truncate" title="${eleve.appreciation || ''}" style="max-width: 150px;">${eleve.appreciation || '-'}</td>
+                    <td class="text-truncate" title="${eleve.observation || ''}" style="max-width: 150px;">${eleve.observation || '-'}</td>
+                    <td class="text-center">${eleve.retard || 0}</td>
+                    <td class="text-center">${eleve.absence || 0}</td>
+                    <td class="text-center">${eleve.conseil_discipline || '-'}</td>
+                `;
+                
+                tableBody.appendChild(row);
+            });
+            
+            // Configurer les en-têtes triables
+            setupSortableHeaders();
+        }
+        
+        // Conversion du sexe en version simple
+        function getSexeSimple(sexe) {
+            if (sexe === 'F') return 'F';
+            if (sexe === 'M' || sexe === 'H') return 'H';
+            return '-';
+        }
+        
+        // Fonction pour afficher les statistiques de la classe
+        function renderClasseStats(stats) {
+            const statsContainer = document.getElementById('classeStats');
+            statsContainer.innerHTML = `
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Effectif total</h6>
+                            <div class="fs-3 fw-bold">${stats.nb_eleves}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Moyenne générale</h6>
+                            <div class="fs-3 fw-bold">${formatNumber(stats.moyenne_classe)}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Élèves ≥ 10</h6>
+                            <div class="fs-3 fw-bold">${stats.nb_moyenne}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Taux de réussite</h6>
+                            <div class="fs-3 fw-bold">${formatNumber(stats.taux_reussite)}%</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Configurer les en-têtes de colonne triables
+        function setupSortableHeaders() {
+            const headers = document.querySelectorAll('#elevesTable th.sortable');
+            headers.forEach(header => {
+                header.addEventListener('click', function() {
+                    const column = this.getAttribute('data-sort');
+                    let direction = 'asc';
+                    
+                    // Inverser la direction si on clique sur la même colonne
+                    if (column === currentSortColumn) {
+                        direction = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                    }
+                    
+                    // Mettre à jour les variables de tri
+                    currentSortColumn = column;
+                    currentSortDirection = direction;
+                    
+                    // Mettre à jour l'indicateur visuel de tri
+                    headers.forEach(h => {
+                        const icon = h.querySelector('i');
+                        icon.className = 'fas fa-sort ms-1';
+                    });
+                    
+                    const icon = this.querySelector('i');
+                    icon.className = `fas fa-sort-${direction === 'asc' ? 'up' : 'down'} ms-1`;
+                    
+                    // Trier et réafficher le tableau
+                    if (currentElevesData && currentElevesData.eleves) {
+                        renderElevesTable([...currentElevesData.eleves]);
+                    }
+                });
+            });
+        }
+        
+        // Fonction pour trier les élèves - version complètement corrigée
+        function sortEleves(eleves, column, direction) {
+            // Créer une nouvelle copie pour éviter toute référence partagée
+            const sorted = JSON.parse(JSON.stringify(eleves));
+            
+            sorted.sort((a, b) => {
+                let valueA, valueB;
+                
+                // Traiter spécifiquement les colonnes numériques
+                if (column === 'rang' || column === 'moyenne' || column === 'retard' || column === 'absence') {
+                    // Assurer que nous travaillons avec des nombres
+                    valueA = parseFloat(a[column]) || 0;
+                    valueB = parseFloat(b[column]) || 0;
+                    
+                    // Tri numérique 
+                    return direction === 'asc' ? valueA - valueB : valueB - valueA;
+                } else {
+                    // Pour le tri des colonnes textuelles
+                    valueA = (a[column] !== null && a[column] !== undefined) ? String(a[column]).toLowerCase() : '';
+                    valueB = (b[column] !== null && b[column] !== undefined) ? String(b[column]).toLowerCase() : '';
+                    
+                    // Tri alphabétique
+                    if (valueA < valueB) return direction === 'asc' ? -1 : 1;
+                    if (valueA > valueB) return direction === 'asc' ? 1 : -1;
+                    
+                    // Si égaux, trier par secondaire (rang)
+                    const rangA = parseInt(a.rang) || 0;
+                    const rangB = parseInt(b.rang) || 0;
+                    return rangA - rangB;
+                }
+            });
+            
+            return sorted;
+        }
+        
+        // Export PDF - Version optimisée avec correction du positionnement du tableau 
+        document.getElementById('btnExportPDF').addEventListener('click', function() {
+            if (!currentElevesData || !currentClasse) return;
+            
+            // Initialiser jsPDF avec l'orientation portrait
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Paramètres du document - Calcul pour centrer le tableau
+            const pageWidth = doc.internal.pageSize.width;
+            const pageHeight = doc.internal.pageSize.height;
+            
+            // Marges calculées pour centrer le tableau sur la page
+            const tableWidth = 172; // Largeur légèrement augmentée
+            const horizontalMargin = (pageWidth - tableWidth) / 2; // Centrage horizontal
+            
+            const margin = {
+                top: 40,                 // Marge supérieure première page augmentée pour laisser place aux en-têtes
+                right: horizontalMargin, // Marge droite calculée pour centrage
+                bottom: 12,              // Marge inférieure réduite davantage
+                left: horizontalMargin,  // Marge gauche calculée pour centrage
+                top_next_pages: 15       // Marge du haut réduite pour les pages suivantes mais suffisante pour éviter de masquer
+            };
+            
+            // Récupérer les données de configuration
+            const config = currentElevesData.configuration || {
+                nom_etablissement: "LYCÉE SEYDINA LIMAMOU LAYE",
+                inspection_academique: "RÉGION DE DAKAR",
+                inspection_education: "DAKAR-OUEST"
+            };
+            
+            // Ajout de la police Times New Roman
+            doc.setFont('times', 'normal');
+            
+            // En-tête administratif - Inspection sur la même ligne que leur valeur
+            doc.setFontSize(10);
+            doc.text(`INSPECTION D'ACADÉMIE ${config.inspection_academique.toUpperCase()}`, pageWidth/2, margin.top - 30, { align: 'center' });
+            doc.text(`INSPECTION DE L'EDUCATION ET DE LA FORMATION ${config.inspection_education.toUpperCase()}`, pageWidth/2, margin.top - 25, { align: 'center' });
+            
+            // En-tête école (gauche) et année scolaire (droite)
+            doc.setFontSize(12);
+            doc.setFont('times', 'bold');
+            doc.text(config.nom_etablissement.toUpperCase(), margin.left, margin.top - 17);
+            doc.text(`ANNÉE SCOLAIRE: ${currentElevesData.annee_scolaire || 'Actuelle'}`, pageWidth - margin.right, margin.top - 17, { align: 'right' });
+            
+            // Ligne de séparation
+            doc.setLineWidth(0.3);
+            doc.line(margin.left, margin.top - 14, pageWidth - margin.right, margin.top - 14);
+            
+            // Titre du document avec indication du semestre
+            doc.setFont('times', 'bold');
+            doc.setFontSize(15);
+            const titre = `LISTE DES ÉLÈVES - ${currentClasse.libelle.toUpperCase()} - SEMESTRE 1`;
+            doc.text(titre, pageWidth/2, margin.top - 9, { align: 'center' });
+            
+            // Sous-titre et niveau
+            doc.setFontSize(12);
+            doc.setFont('times', 'normal');
+            doc.text(`Niveau: ${currentClasse.niveau}`, pageWidth/2, margin.top - 3, { align: 'center' });
+            
+            // Statistiques de classe
+            const stats = currentElevesData.statistiques;
+            doc.setFontSize(11);
+            const statsText = `Effectif: ${stats.nb_eleves} élèves | Moyenne: ${formatNumber(stats.moyenne_classe)} | Taux: ${formatNumber(stats.taux_reussite)}%`;
+            doc.text(statsText, pageWidth/2, margin.top + 2, { align: 'center' });
+            
+            // Fonction pour déterminer l'observation
+            function getObservation(moyenne) {
+                if (moyenne >= 17) return "Félicitations";
+                if (moyenne >= 15 && moyenne < 17) return "Encouragements";
+                if (moyenne >= 12 && moyenne < 15) return "Tableau d'honneur";
+                if (moyenne >= 10 && moyenne < 12) return "Doit mieux faire";
+                return "Risque de redoublement";
+            }
+            
+            // Préparer les données pour le tableau avec abréviations
+            const tableData = currentElevesData.eleves.map(eleve => [
+                eleve.rang || '-',
+                eleve.prenom || '-',
+                eleve.nom || '-',
+                getSexeSimple(eleve.sexe),
+                formatNumber(eleve.moyenne),
+                (eleve.appreciation || '-'),
+                (eleve.observation || getObservation(eleve.moyenne)),
+                eleve.retard || 0,
+                eleve.absence || 0,
+                (eleve.conseil_discipline || '-')
+            ]);
+            
+            // Définir les en-têtes de colonnes sans aucun retour à la ligne
+            const headers = [
+                ['R', 'Prénom', 'Nom', 'Sexe', 'Moy', 'Appréciation', 'Observation', 'Ret', 'Abs', 'CD']
+            ];
+
+            // Variables pour gérer la continuité du tableau
+            let firstTableEndY;
+            
+            // Créer le tableau avec style noir et blanc officiel - centré sur la page
+            doc.autoTable({
+                startY: 48, // Légère remontée du tableau sur la première page
+                head: headers,
+                body: tableData,
+                theme: 'grid',
+                margin: {
+                    left: margin.left,
+                    right: margin.right,
+                    top: 12, // Marge haute réduite pour toutes les pages (évite le décalage sur les suivantes)
+                    bottom: margin.bottom
+                },
+                headStyles: { 
+                    fillColor: [255, 255, 255],
+                    textColor: 0,
+                    fontStyle: 'bold',
+                    fontSize: 12,  // Augmenté pour une meilleure lisibilité des en-têtes
+                    cellPadding: {top: 1.5, right: 2, bottom: 1.5, left: 2},
+                    lineWidth: 0.2,
+                    lineColor: [0, 0, 0],
+                    halign: 'center',
+                    font: 'times',
+                    minCellHeight: 7,
+                    cellWidth: 'wrap',
+                    overflow: 'visible'
+                },
+                alternateRowStyles: { 
+                    fillColor: [255, 255, 255]
+                },
+                styles: { 
+                    fontSize: 11,  // Texte du tableau plus grand pour une meilleure lisibilité
+                    font: 'times',
+                    cellPadding: {top: 1.5, right: 1.5, bottom: 1.5, left: 1.5},
+                    overflow: 'linebreak',
+                    lineWidth: 0.1,
+                    lineColor: [0, 0, 0],
+                    textColor: 0
+                },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center', overflow: 'visible' },      // R (corrigé: largeur 12, overflow visible)
+                    1: { cellWidth: 28 },                       // Prénom
+                    2: { cellWidth: 28 },                       // Nom
+                    3: { cellWidth: 9, halign: 'center' },      // Sexe
+                    4: { cellWidth: 11, halign: 'center', overflow: 'visible' }, // Moy
+                    5: { cellWidth: 31 },                       // Appréciation
+                    6: { cellWidth: 37 },                       // Observation
+                    7: { cellWidth: 8, halign: 'center', overflow: 'visible' },  // Retard
+                    8: { cellWidth: 8, halign: 'center', overflow: 'visible' },  // Abs
+                    9: { cellWidth: 6, halign: 'center' }       // CD
+                },
+                didDrawCell: function(data) {
+                    // Forcer la colonne R à ne jamais renvoyer à la ligne
+                    if (data.column.index === 0) {
+                        data.cell.styles.overflow = 'visible';
+                        data.cell.styles.cellWidth = 12;
+                    }
+                },
+                didDrawPage: function (data) {
+                    // Pied de page standardisé sur toutes les pages
+                    const displayFooter = () => {
+                        // Pied de page - Copyright et numéro de page avec classe
+                        doc.setFont('times', 'normal');
+                        doc.setFontSize(8);
+                        
+                        // Numéro de page à droite avec nom de la classe
+                        doc.text(`Page ${data.pageNumber} - ${currentClasse.libelle}`, pageWidth - margin.right, pageHeight - 5, { align: 'right' });
+                        
+                        // Copyright LCAMS en bas à gauche
+                        doc.text("© LCAMS " + new Date().getFullYear(), margin.left, pageHeight - 5);
+                        
+                        // Date d'impression au centre
+                        const dateImpression = new Date().toLocaleDateString('fr-FR');
+                        doc.text(`Imprimé le: ${dateImpression}`, pageWidth/2, pageHeight - 5, { align: 'center' });
+                    };
+                    
+                    if (data.pageNumber > 1) {
+                        doc.setFont('times', 'bold');
+                        doc.setFontSize(10);
+                        doc.text(`${currentClasse.libelle} - SEMESTRE 1 (Suite)`, margin.left, 12);
+                        doc.text(`P.${data.pageNumber}`, pageWidth - margin.right, 12, { align: 'right' });
+                        doc.setLineWidth(0.1);
+                        doc.line(margin.left, 14, pageWidth - margin.right, 14);
+                    }
+                    displayFooter();
+                },
+                bodyStyles: {
+                    minCellHeight: 6
+                },
+                tablePageBreak: 'auto',
+                tableWidth: 'wrap',
+                showHead: 'firstPage',
+                rowPageBreak: 'auto',
+                spaceBottom: 0.5,
+                useCss: true,
+                verticalPageBreakAllow: false
+            });
+            
+            // Générer et télécharger le PDF
+            doc.save(`liste_eleves_${currentClasse.libelle}_semestre1_${new Date().toISOString().slice(0, 10)}.pdf`);
+        });
+    });
 </script>
 {% endblock %}

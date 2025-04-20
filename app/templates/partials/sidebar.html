@@ -5,70 +5,70 @@
     <div class="list-group list-group-flush">
         {% if 'admin' in request.path %}
             <a href="{{ url_for('admin.index') }}#etablissement" class="list-group-item {% if request.args.get('tab') == 'etablissement' or not request.args.get('tab') %}active{% endif %}">
-                <i class="fas fa-school"></i> Établissement
+                <i class="fas fa-school me-2"></i> Établissement
             </a>
             <a href="{{ url_for('admin.index') }}#annee" class="list-group-item {% if request.args.get('tab') == 'annee' %}active{% endif %}">
-                <i class="fas fa-calendar-alt"></i> Année scolaire
+                <i class="fas fa-calendar-alt me-2"></i> Année scolaire
             </a>
             <a href="{{ url_for('admin.index') }}#niveaux" class="list-group-item {% if request.args.get('tab') == 'niveaux' %}active{% endif %}">
-                <i class="fas fa-layer-group"></i> Niveaux
+                <i class="fas fa-layer-group me-2"></i> Niveaux
             </a>
             <a href="{{ url_for('admin.index') }}#classes" class="list-group-item {% if request.args.get('tab') == 'classes' %}active{% endif %}">
-                <i class="fas fa-chalkboard"></i> Classes
+                <i class="fas fa-chalkboard me-2"></i> Classes
             </a>
             <a href="{{ url_for('admin.index') }}#backup" class="list-group-item {% if request.args.get('tab') == 'backup' %}active{% endif %}">
-                <i class="fas fa-database"></i> Sauvegarde
+                <i class="fas fa-database me-2"></i> Sauvegarde
             </a>
         {% elif 'semestre1' in request.path %}
-            <a href="{{ url_for('semestre1.index') }}" class="list-group-item {% if active_tab == 'overview' or not active_tab %}active{% endif %}">
-                <i class="fas fa-chart-pie"></i> Vue d'ensemble
+            <a href="{{ url_for('semestre1.index') }}" class="list-group-item {% if request.endpoint == 'semestre1.index' and not request.args.get('tab') %}active{% endif %}">
+                <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
             </a>
-            <a href="{{ url_for('semestre1.index') }}?tab=moyennes" class="list-group-item {% if active_tab == 'moyennes' %}active{% endif %}">
-                <i class="fas fa-chart-line"></i> Analyse des moyennes
+            <a href="{{ url_for('semestre1.moyennes_analysis') }}" class="list-group-item {% if request.endpoint == 'semestre1.moyennes_analysis' %}active{% endif %}">
+                <i class="fas fa-chart-line me-2"></i> Analyse des moyennes
             </a>
-            <a href="{{ url_for('semestre1.index') }}?tab=disciplines" class="list-group-item {% if active_tab == 'disciplines' %}active{% endif %}">
-                <i class="fas fa-book"></i> Analyse par discipline
+            <a href="{{ url_for('semestre1.discipline_analysis') }}" class="list-group-item {% if request.endpoint == 'semestre1.discipline_analysis' %}active{% endif %}">
+                <i class="fas fa-leaf me-2"></i> Analyse par discipline
             </a>
-            <a href="{{ url_for('semestre1.index') }}?tab=reports" class="list-group-item {% if active_tab == 'reports' %}active{% endif %}">
-                <i class="fas fa-file-alt"></i> Rapports
+            <a href="{{ url_for('semestre1.report') }}" class="list-group-item {% if request.endpoint == 'semestre1.report' %}active{% endif %}">
+                <i class="fas fa-file-alt me-2"></i> Rapports
             </a>
-            <a href="{{ url_for('semestre1.index') }}?tab=import" class="list-group-item {% if active_tab == 'import' %}active{% endif %}">
-                <i class="fas fa-upload"></i> Importation
+            <a href="{{ url_for('semestre1.index') }}?tab=import" class="list-group-item {% if request.args.get('tab') == 'import' %}active{% endif %}">
+                <i class="fas fa-upload me-2"></i> Importation
             </a>
             <div class="mt-4 px-3">
                 <hr class="border-white opacity-25">
                 <a href="{{ url_for('main.index') }}" class="list-group-item">
-                    <i class="fas fa-home"></i> Accueil
+                    <i class="fas fa-home me-2"></i> Accueil
                 </a>
                 <a href="{{ url_for('admin.index') }}" class="list-group-item">
-                    <i class="fas fa-cog"></i> Paramètres
+                    <i class="fas fa-cog me-2"></i> Paramètres
                 </a>
             </div>
         {% elif 'semestre2' in request.path %}
             <a href="{{ url_for('semestre2.index') }}" class="list-group-item active">
-                <i class="fas fa-chart-pie"></i> Vue d'ensemble
+                <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
             </a>
             <div class="mt-4 px-3">
                 <hr class="border-white opacity-25">
                 <a href="{{ url_for('main.index') }}" class="list-group-item">
-                    <i class="fas fa-home"></i> Accueil
+                    <i class="fas fa-home me-2"></i> Accueil
                 </a>
                 <a href="{{ url_for('admin.index') }}" class="list-group-item">
-                    <i class="fas fa-cog"></i> Paramètres
+                    <i class="fas fa-cog me-2"></i> Paramètres
                 </a>
             </div>
         {% else %}
             <a href="{{ url_for('main.index') }}" class="list-group-item active">
-                <i class="fas fa-home"></i> Accueil
+                <i class="fas fa-home me-2"></i> Accueil
             </a>
             <a href="{{ url_for('semestre1.index') }}" class="list-group-item">
-                <i class="fas fa-calendar-alt"></i> Semestre 1
+                <i class="fas fa-calendar-alt me-2"></i> Semestre 1
             </a>
             <a href="{{ url_for('semestre2.index') }}" class="list-group-item">
-                <i class="fas fa-calendar-check"></i> Semestre 2
+                <i class="fas fa-calendar-check me-2"></i> Semestre 2
             </a>
             <a href="{{ url_for('admin.index') }}" class="list-group-item">
-                <i class="fas fa-cog"></i> Paramètres
+                <i class="fas fa-cog me-2"></i> Paramètres
             </a>
         {% endif %}
     </div>

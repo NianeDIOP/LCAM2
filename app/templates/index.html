@@ -15,73 +15,73 @@
     </div>
 </div>
 
-<div class="container">
+<div class="container mt-4">
     <!-- Statistiques -->
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4 mb-5">
-        <div class="col-md-3 mb-3">
-            <div class="feature-card">
-                <i class="fas fa-user-graduate icon text-primary"></i>
-                <h2 class="text-primary fw-bold fs-1">{{ stats.total_eleves }}</h2>
-                <p class="text-muted">Élèves évalués</p>
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-3">
+            <div class="feature-card h-100">
+                <i class="fas fa-user-graduate icon"></i>
+                <div class="stat-value fs-2">{{ stats.total_eleves }}</div>
+                <div class="stat-label">Élèves évalués</div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="feature-card">
-                <i class="fas fa-chalkboard icon text-info"></i>
-                <h2 class="text-info fw-bold fs-1">{{ stats.total_classes }}</h2>
-                <p class="text-muted">Classes</p>
+        <div class="col-sm-6 col-md-3">
+            <div class="feature-card h-100">
+                <i class="fas fa-chalkboard icon"></i>
+                <div class="stat-value fs-2">{{ stats.total_classes }}</div>
+                <div class="stat-label">Classes</div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="feature-card">
-                <i class="fas fa-check-circle icon text-success"></i>
-                <h2 class="text-success fw-bold fs-1">{{ stats.taux_reussite }}%</h2>
-                <p class="text-muted">Taux de réussite</p>
+        <div class="col-sm-6 col-md-3">
+            <div class="feature-card h-100">
+                <i class="fas fa-check-circle icon"></i>
+                <div class="stat-value fs-2">{{ stats.taux_reussite }}%</div>
+                <div class="stat-label">Taux de réussite</div>
             </div>
         </div>
-        <div class="col-md-3 mb-3">
-            <div class="feature-card">
-                <i class="fas fa-calendar-alt icon text-warning"></i>
-                <h2 class="text-warning fw-bold fs-1">{{ annee_active }}</h2>
-                <p class="text-muted">Année scolaire</p>
+        <div class="col-sm-6 col-md-3">
+            <div class="feature-card h-100">
+                <i class="fas fa-calendar-alt icon"></i>
+                <div class="stat-value fs-2">{{ annee_active }}</div>
+                <div class="stat-label">Année scolaire</div>
             </div>
         </div>
     </div>
 
     <!-- Fonctionnalités clés -->
     <h2 id="fonctionnalites" class="text-center text-primary mb-4 fw-bold">Fonctionnalités clés</h2>
-    <div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-body text-center p-4">
-                    <i class="fas fa-clipboard-list fa-3x text-primary mb-3"></i>
+    <div class="row g-4 mb-5">
+        <div class="col-md-4">
+            <div class="card h-100 feature-card">
+                <div class="card-body d-flex flex-column">
+                    <i class="fas fa-clipboard-list icon"></i>
                     <h3>Module Semestre 1</h3>
-                    <p class="text-muted mb-4">Importez et analysez les résultats du premier semestre. Visualisez les performances et générez des rapports.</p>
-                    <a href="{{ url_for('semestre1.index') }}" class="btn btn-primary">
+                    <p class="text-muted mb-4 flex-grow-1">Importez et analysez les résultats du premier semestre. Visualisez les performances et générez des rapports.</p>
+                    <a href="{{ url_for('semestre1.index') }}" class="btn btn-primary mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Accéder
                     </a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-body text-center p-4">
-                    <i class="fas fa-clipboard-check fa-3x text-success mb-3"></i>
+        <div class="col-md-4">
+            <div class="card h-100 feature-card">
+                <div class="card-body d-flex flex-column">
+                    <i class="fas fa-clipboard-check icon"></i>
                     <h3>Module Semestre 2</h3>
-                    <p class="text-muted mb-4">Gérez les résultats du second semestre. Comparez les performances avec le premier semestre.</p>
-                    <a href="{{ url_for('semestre2.index') }}" class="btn btn-success">
+                    <p class="text-muted mb-4 flex-grow-1">Gérez les résultats du second semestre. Comparez les performances avec le premier semestre.</p>
+                    <a href="{{ url_for('semestre2.index') }}" class="btn btn-success mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Accéder
                     </a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4 mb-4">
-            <div class="card h-100">
-                <div class="card-body text-center p-4">
-                    <i class="fas fa-chart-bar fa-3x text-danger mb-3"></i>
+        <div class="col-md-4">
+            <div class="card h-100 feature-card">
+                <div class="card-body d-flex flex-column">
+                    <i class="fas fa-chart-bar icon"></i>
                     <h3>Module Général</h3>
-                    <p class="text-muted mb-4">Analysez les tendances annuelles, comparez les semestres et prenez des décisions éclairées.</p>
-                    <a href="#" class="btn btn-danger">
+                    <p class="text-muted mb-4 flex-grow-1">Analysez les tendances annuelles, comparez les semestres et prenez des décisions éclairées.</p>
+                    <a href="#" class="btn btn-danger mt-auto">
                         <i class="fas fa-arrow-right me-1"></i> Accéder
                     </a>
                 </div>
@@ -94,29 +94,29 @@
 <section class="indicators-section">
     <div class="container">
         <h2 class="indicators-title">Indicateurs de performance</h2>
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4">
-            <div class="col-md-3 mb-4">
+        <div class="row g-4">
+            <div class="col-sm-6 col-md-3">
                 <div class="indicator-card">
                     <i class="fas fa-percent icon"></i>
                     <h3>Taux de réussite</h3>
                     <p>Suivez l'évolution du taux de réussite par classe, niveau et établissement.</p>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-sm-6 col-md-3">
                 <div class="indicator-card">
                     <i class="fas fa-chart-line icon"></i>
                     <h3>Moyenne générale</h3>
                     <p>Analysez les tendances de la moyenne générale à différents niveaux.</p>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-sm-6 col-md-3">
                 <div class="indicator-card">
                     <i class="fas fa-user-graduate icon"></i>
                     <h3>Performance par matière</h3>
                     <p>Identifiez les points forts et les faiblesses dans chaque discipline.</p>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+            <div class="col-sm-6 col-md-3">
                 <div class="indicator-card">
                     <i class="fas fa-chart-area icon"></i>
                     <h3>Progression semestrielle</h3>
@@ -130,30 +130,30 @@
 <!-- Comment utiliser LCAMS -->
 <div class="container my-5">
     <h2 class="text-center text-primary mb-4 fw-bold">Comment utiliser LCAMS</h2>
-    <div class="row row-cols-1 row-cols-sm-2 row-cols-md-4 g-4">
-        <div class="col-md-3 mb-4">
-            <div class="step-card">
+    <div class="row g-4">
+        <div class="col-sm-6 col-md-3">
+            <div class="step-card h-100">
                 <div class="step-number">1</div>
                 <h3>Copier-coller les moyennes</h3>
                 <p>Utilisez les statistiques de PLANETE pour copier et coller les moyennes des élèves dans la base des semestres 1 ou 2 du logiciel.</p>
             </div>
         </div>
-        <div class="col-md-3 mb-4">
-            <div class="step-card">
+        <div class="col-sm-6 col-md-3">
+            <div class="step-card h-100">
                 <div class="step-number">2</div>
                 <h3>Validation des données</h3>
                 <p>Validez les données collées pour assurer leur exactitude et fiabilité avant analyse.</p>
             </div>
         </div>
-        <div class="col-md-3 mb-4">
-            <div class="step-card">
+        <div class="col-sm-6 col-md-3">
+            <div class="step-card h-100">
                 <div class="step-number">3</div>
                 <h3>Intégration des disciplines</h3>
                 <p>Copiez et collez les moyennes des disciplines dans leurs bases respectives du logiciel.</p>
             </div>
         </div>
-        <div class="col-md-3 mb-4">
-            <div class="step-card">
+        <div class="col-sm-6 col-md-3">
+            <div class="step-card h-100">
                 <div class="step-number">4</div>
                 <h3>Exploitation des résultats</h3>
                 <p>Naviguez librement dans le logiciel et téléchargez toutes les informations souhaitées pour vos analyses.</p>
@@ -166,8 +166,8 @@
 <section class="bg-light py-5">
     <div class="container">
         <h2 class="text-center text-primary mb-4 fw-bold">Statistiques disponibles</h2>
-        <div class="row row-cols-1 row-cols-md-3 g-4">
-            <div class="col-md-4 mb-4">
+        <div class="row g-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -178,7 +178,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -189,7 +189,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -200,7 +200,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -211,7 +211,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">
@@ -222,7 +222,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-md-4 mb-4">
+            <div class="col-md-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <div class="d-flex align-items-center mb-3">

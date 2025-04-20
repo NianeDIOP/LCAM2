@@ -1,100 +1,615 @@
-<!-- Define API endpoints for JS -->
-<script>
-  window.apiEndpoints = {
-    getClasses: "{{ url_for('semestre1.get_classes', niveau_id=0) }}",
-    getDisciplines: "{{ url_for('semestre1.get_disciplines', classe_id=0) }}",
-    statsMoyennes: "{{ url_for('semestre1.stats_moyennes') }}",
-    statsDiscipline: "{{ url_for('semestre1.stats_discipline') }}"
-  };
-</script>
+{% extends 'with_sidebar.html' %}
+{% block body_class %}theme-semestre1{% endblock %}
 
-<div class="moyennes-analysis">
-  <!-- Filtres en en-tête compact -->
-  <div class="card mb-3">
-    <div class="card-body py-2">
-      <div class="row g-2 align-items-end">
-        <div class="col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label">Niveau</label>
-          <select class="form-select form-select-sm" id="niveau" name="niveau_id">
-            <option value="">Tous niveaux</option>
-            {% for niv in niveaux %}
-            <option value="{{ niv.id }}">{{ niv.libelle }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label">Classe</label>
-          <select class="form-select form-select-sm" id="classe" name="classe_id" disabled>
-            <option>Sélectionner niveau</option>
-          </select>
-        </div>
-        <div class="col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label">Sexe</label>
-          <select class="form-select form-select-sm" id="sexe" name="sexe">
-            <option value="">Tous</option>
-            <option value="M">Masculin</option>
-            <option value="F">Féminin</option>
-          </select>
-        </div>
-        <div class="col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label">Note min</label>
-          <input type="number" step="0.1" class="form-control form-control-sm" id="note_min" name="note_min" min="0" max="20" placeholder="0">
-        </div>
-        <div class="col-sm-6 col-md-4 col-lg-2">
-          <label class="form-label">Note max</label>
-          <input type="number" step="0.1" class="form-control form-control-sm" id="note_max" name="note_max" min="0" max="20" placeholder="20">
-        </div>
-        <div class="col-sm-6 col-md-4 col-lg-2 text-end">
-          <button class="btn btn-primary btn-sm" id="btnFiltrerMoyennes">
-            <i class="fas fa-search me-1"></i>Filtrer
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+{% set title = 'Semestre 1' %}
 
-  <!-- Cartes de synthèse compactes (dynamiques) -->
-  <div id="moyennesStats" class="row g-2 mb-3">
-    <div class="col-lg-3 col-md-6">
-      <div class="card stat-card">
-        <div class="icon text-primary"><i class="fas fa-users"></i></div>
-        <div class="value">{{ stats.total_eleves }}</div>
-        <div class="label">Effectif total</div>
-        <small class="text-muted">Hommes: {{ stats.count_hommes }} ({{ stats.taux_hommes }}%)</small><br>
-        <small class="text-muted">Femmes: {{ stats.count_femmes }} ({{ stats.taux_femmes }}%)</small>
-      </div>
+{% block sidebar_content %}
+    <a href="{{ url_for('semestre1.index') }}#tab-overview" class="list-group-item{% if request.endpoint == 'semestre1.index' and (not request.args.get('tab') or request.args.get('tab') == 'overview') %} active{% endif %}">
+        <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
+    </a>
+    <a href="{{ url_for('semestre1.moyennes_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.moyennes_analysis' %} active{% endif %}">
+        <i class="fas fa-chart-line me-2"></i> Analyse des moyennes
+    </a>
+    <a href="{{ url_for('semestre1.discipline_analysis') }}" class="list-group-item{% if request.endpoint == 'semestre1.discipline_analysis' %} active{% endif %}">
+        <i class="fas fa-leaf me-2"></i> Analyse par discipline
+    </a>
+    <a href="{{ url_for('semestre1.report') }}" class="list-group-item{% if request.endpoint == 'semestre1.report' %} active{% endif %}">
+        <i class="fas fa-file-alt me-2"></i> Rapports
+    </a>
+    <a href="{{ url_for('semestre1.index') }}#tab-import" class="list-group-item{% if request.args.get('tab') == 'import' %} active{% endif %}">
+        <i class="fas fa-upload me-2"></i> Importation
+    </a>
+    <div class="mt-auto p-3">
+        <hr class="border-white opacity-25">
+        <a href="{{ url_for('main.index') }}" class="list-group-item">
+            <i class="fas fa-home me-2"></i> Accueil
+        </a>
+        <a href="{{ url_for('admin.index') }}" class="list-group-item">
+            <i class="fas fa-cog me-2"></i> Paramètres
+        </a>
     </div>
-    <div class="col-lg-3 col-md-6">
-      <div class="card stat-card">
-        <div class="icon text-success"><i class="fas fa-user-check"></i></div>
-        <div class="value">{{ stats.eleves_moyenne }}</div>
-        <div class="label">Élèves ≥ 10</div>
-        <small class="text-muted">Hommes: {{ stats.reussite_hommes }} ({{ stats.taux_reussite_hommes }}%)</small><br>
-        <small class="text-muted">Femmes: {{ stats.reussite_femmes }} ({{ stats.taux_reussite_femmes }}%)</small>
-      </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-      <div class="card stat-card">
-        <div class="icon text-info"><i class="fas fa-calculator"></i></div>
-        <div class="value">{{ stats.moyenne_generale }}</div>
-        <div class="label">Moyenne générale</div>
-        <small class="text-muted">Min: {{ stats.min }} / Max: {{ stats.max }}</small>
-      </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-      <div class="card h-100">
-        <div class="card-body p-2 d-flex flex-column">
-          <canvas id="mentionsChart" class="flex-fill"></canvas>
-          <hr class="my-2">
-          <canvas id="performanceChart" class="flex-fill"></canvas>
-        </div>
-      </div>
-    </div>
-  </div>  <!-- /#moyennesStats -->
+{% endblock %}
 
+{% block main_content %}
+<div class="page-header d-flex justify-content-between align-items-center moyennes-analysis-header">
+    <div>
+        <h1 class="page-title">Analyse des moyennes</h1>
+        <p>Statistiques du {{ annee_scolaire }} - Semestre 1</p>
+    </div>
+    <div>
+        <button class="btn btn-sm btn-outline-secondary me-2" id="btnPrintAnalysis">
+            <i class="fas fa-print me-1"></i> Imprimer
+        </button>
+        <button class="btn btn-sm btn-outline-success" id="btnExportAnalysis">
+            <i class="fas fa-file-excel me-1"></i> Exporter
+        </button>
+    </div>
 </div>
+
+<!-- Filtres -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filtres</h5>
+    </div>
+    <div class="card-body">
+        <form action="{{ url_for('semestre1.moyennes_analysis') }}" method="get" class="mb-0">
+            <div class="row g-2 align-items-end">
+                <div class="col-sm-6 col-md-4 col-lg-2">
+                    <label for="niveau" class="form-label">Niveau</label>
+                    <select class="form-select form-select-sm" id="niveau" name="niveau_id">
+                        <option value="">Tous niveaux</option>
+                        {% for niv in niveaux %}
+                        <option value="{{ niv.id }}" {% if filtres.niveau_id|string == niv.id|string %}selected{% endif %}>{{ niv.libelle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-2">
+                    <label for="classe" class="form-label">Classe</label>
+                    <select class="form-select form-select-sm" id="classe" name="classe_id" {% if not classes %}disabled{% endif %}>
+                        <option value="">Toutes classes</option>
+                        {% for classe in classes %}
+                        <option value="{{ classe.id }}" {% if filtres.classe_id|string == classe.id|string %}selected{% endif %}>{{ classe.libelle }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-2">
+                    <label for="sexe" class="form-label">Sexe</label>
+                    <select class="form-select form-select-sm" id="sexe" name="sexe">
+                        <option value="">Tous</option>
+                        <option value="M" {% if filtres.sexe == 'M' %}selected{% endif %}>Masculin</option>
+                        <option value="F" {% if filtres.sexe == 'F' %}selected{% endif %}>Féminin</option>
+                    </select>
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-2">
+                    <label for="note_min" class="form-label">Note min</label>
+                    <input type="number" step="0.1" class="form-control form-control-sm" id="note_min" name="note_min" min="0" max="20" placeholder="0" value="{{ filtres.note_min }}">
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-2">
+                    <label for="note_max" class="form-label">Note max</label>
+                    <input type="number" step="0.1" class="form-control form-control-sm" id="note_max" name="note_max" min="0" max="20" placeholder="20" value="{{ filtres.note_max }}">
+                </div>
+                <div class="col-sm-6 col-md-4 col-lg-2 text-end">
+                    <button type="submit" class="btn btn-primary btn-sm w-100">
+                        <i class="fas fa-search me-1"></i>Filtrer
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tableau de bord principal -->
+<div class="dashboard mb-4">
+    <div class="row align-items-stretch">
+        <!-- Colonne de gauche: Statistiques principales et graphique par niveau -->
+        <div class="col-lg-8 h-100">
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Effectifs -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-theme">
+                            <h5 class="card-title mb-0">EFFECTIF</h5>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="row g-0 text-center mb-2">
+                                <div class="col-4 border-end">
+                                    <div class="stat-value">{{ stats.total_eleves }}</div>
+                                    <div class="stat-label">TOTAL</div>
+                                </div>
+                                <div class="col-4 border-end">
+                                    <div class="stat-value">{{ stats.total_filles }}</div>
+                                    <div class="stat-label">FILLES</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-value">{{ stats.total_garcons }}</div>
+                                    <div class="stat-label">GARÇONS</div>
+                                </div>
+                            </div>
+                            <div class="position-relative" style="height: 150px;">
+                                <canvas id="effectifPieChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Moyennes >= 10 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-theme">
+                            <h5 class="card-title mb-0">MOYENNE >=10</h5>
+                        </div>
+                        <div class="card-body p-2">
+                            <div class="row g-0 text-center mb-2">
+                                <div class="col-4 border-end">
+                                    <div class="stat-value">{{ stats.reussite_count }}</div>
+                                    <div class="stat-label">TOTAL</div>
+                                </div>
+                                <div class="col-4 border-end">
+                                    <div class="stat-value">{{ stats.reussite_filles }}</div>
+                                    <div class="stat-label">FILLES</div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="stat-value">{{ stats.reussite_garcons }}</div>
+                                    <div class="stat-label">GARÇONS</div>
+                                </div>
+                            </div>
+                            <div class="position-relative text-center my-2">
+                                <div class="circle-progress mx-auto" style="width: 120px; height: 120px;">
+                                    <div class="progress-bar-circle" data-value="{{ stats.taux_reussite / 100 }}"></div>
+                                    <div class="progress-value fs-1">
+                                        {{ stats.taux_reussite }}%
+                                    </div>
+                                    <div class="progress-label">TAUX</div>
+                                </div>
+                                <div class="d-flex justify-content-around mt-2">
+                                    <div>
+                                        <span class="badge bg-theme-secondary">
+                                            <i class="fas fa-female"></i> {{ stats.taux_reussite_filles }}%
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-theme-primary">
+                                            <i class="fas fa-male"></i> {{ stats.taux_reussite_garcons }}%
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Moyennes par niveau -->
+            <div class="card mb-3">
+                <div class="card-header bg-theme">
+                    <h5 class="card-title mb-0">MOYENNES GÉNÉRALES PAR NIVEAU</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="position-relative" style="height: 200px;">
+                        <canvas id="moyennesNiveauChart" data-labels="{{ labels_niveaux|tojson }}" data-values="{{ valeurs_moyennes|tojson }}"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Colonne de droite: Indicateurs et retards/absences -->
+        <div class="col-lg-4 d-flex flex-column h-100">
+            <!-- Indicateurs de performances -->
+            <div class="card mb-3 h-100">
+                <div class="card-header bg-theme">
+                    <h5 class="card-title mb-0">INDICATEURS DE PERFORMANCES</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="row g-0 border-bottom text-center">
+                        <div class="col-4 p-2 stat-label">NOTE MOYENNE</div>
+                        <div class="col-4 p-2 stat-label border-start border-end">PLUS FORTE</div>
+                        <div class="col-4 p-2 stat-label">PLUS FAIBLE</div>
+                    </div>
+                    <div class="row g-0 border-bottom text-center">
+                        <div class="col-4 p-2">
+                            <div class="stat-value">{{ stats.moyenne_generale }}</div>
+                        </div>
+                        <div class="col-4 p-2 border-start border-end">
+                            <div class="stat-value">{{ stats.plus_forte_moyenne }}</div>
+                        </div>
+                        <div class="col-4 p-2">
+                            <div class="stat-value">{{ stats.plus_faible_moyenne }}</div>
+                        </div>
+                    </div>
+                    <div class="row g-0 border-bottom text-center">
+                        <div class="col-6 p-2 stat-label">MÉDIANE</div>
+                        <div class="col-6 p-2 stat-label border-start">ÉCART-TYPE</div>
+                    </div>
+                    <div class="row g-0 border-bottom text-center">
+                        <div class="col-6 p-2">
+                            <div class="stat-value">{{ stats.mediane }}</div>
+                        </div>
+                        <div class="col-6 p-2 border-start">
+                            <div class="stat-value">{{ stats.ecart_type }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Retards et absences -->
+            <div class="card h-100">
+                <div class="card-header bg-theme">
+                    <h5 class="card-title mb-0">RETARDS ET ABSENCES (S1)</h5>
+                </div>
+                <div class="card-body p-2">
+                    <div class="position-relative" style="height: 200px;">
+                        <canvas id="absencesRetardsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- NOUVEAU : Les deux graphiques couvrent toute la largeur sous les deux colonnes -->
+    <div class="row mt-2">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-theme">
+                    <h5 class="card-title mb-0">RÉPARTITION DES APPRÉCIATIONS</h5>
+                </div>
+                <div class="card-body p-0 d-flex align-items-center justify-content-center" style="min-height:320px;">
+                    {% set appr_labels = appreciation_counts.keys()|list %}
+                    {% set appr_values = appreciation_counts.values()|list %}
+                    {% if appr_labels|length == 0 or appr_values|sum == 0 %}
+                        <div class="text-center text-muted w-100">Aucune donnée disponible pour ce graphique</div>
+                    {% else %}
+                    <div class="position-relative w-100" style="height:300px;">
+                        <canvas id="appreciationsBarChart"
+                            data-labels='{{ appr_labels|tojson }}'
+                            data-values='{{ appr_values|tojson }}' style="height:100% !important;"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-theme">
+                    <h5 class="card-title mb-0">RÉPARTITION DES OBSERVATIONS</h5>
+                </div>
+                <div class="card-body p-0 d-flex align-items-center justify-content-center" style="min-height:320px;">
+                    {% set obs_labels = observation_counts.keys()|list %}
+                    {% set obs_values = observation_counts.values()|list %}
+                    {% if obs_labels|length == 0 or obs_values|sum == 0 %}
+                        <div class="text-center text-muted w-100">Aucune donnée disponible pour ce graphique</div>
+                    {% else %}
+                    <div class="position-relative w-100" style="height:300px;">
+                        <canvas id="observationsPieChart"
+                            data-labels='{{ obs_labels|tojson }}'
+                            data-values='{{ obs_values|tojson }}' style="height:100% !important;"></canvas>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<style>
+.dashboard .card {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-radius: 10px;
+    border: none;
+}
+.dashboard .card-header {
+    background: linear-gradient(90deg, #1976d2 0%, #42a5f5 100%);
+    color: #fff;
+    border-radius: 10px 10px 0 0;
+    padding: 0.6rem 1rem;
+    border-bottom: none;
+    box-shadow: 0 2px 8px rgba(25,118,210,0.08);
+}
+.dashboard .card-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.dashboard .stat-value {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #1976d2;
+}
+.dashboard .stat-label {
+    font-size: 0.85rem;
+    color: #607d8b;
+    font-weight: 500;
+    text-transform: uppercase;
+}
+.dashboard .card-body {
+    padding: 0.8rem 1rem 1rem 1rem;
+}
+.dashboard .row > [class^='col-'] { margin-bottom: 0; }
+.dashboard .card.mb-3, .dashboard .card.mb-4 { margin-bottom: 1rem !important; }
+.dashboard .card .card-header { border-radius: 10px 10px 0 0; }
+.dashboard .card .card-title { font-size: 1.05rem; }
+body.theme-semestre1 main { margin-top: 10px !important; }
+@media (max-width: 991px) {
+  .dashboard .row > [class^='col-'] { margin-bottom: 1.5rem; }
+}
+/* Réduire la taille des graphiques */
+#appreciationsBarChart, #observationsPieChart {
+    max-height: 300px !important;
+    min-height: 220px;
+}
+</style>
+
+<!-- JavaScript pour initialiser les graphiques -->
 <script>
-// Après chargement, afficher dynamiquement les cartes et graphiques
-createMoyennesCharts();
-filtrerMoyennes();
+document.addEventListener('DOMContentLoaded', function() {
+    const themePrimary = getComputedStyle(document.documentElement).getPropertyValue('--theme-primary').trim() || '#3498db';
+    const themeSecondary = getComputedStyle(document.documentElement).getPropertyValue('--theme-secondary').trim() || '#f48fb1';
+    const themeWarning = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim() || '#f39c12';
+    const themeDanger = getComputedStyle(document.documentElement).getPropertyValue('--danger').trim() || '#e74c3c';
+
+    // Graphique circulaire des effectifs
+    const effectifCtx = document.getElementById('effectifPieChart');
+    if (effectifCtx) {
+        new Chart(effectifCtx, {
+            type: 'pie',
+            data: {
+                labels: ['Filles', 'Garçons'],
+                datasets: [{
+                    data: [{{ stats.total_filles }}, {{ stats.total_garcons }}],
+                    backgroundColor: [themeSecondary, themePrimary],
+                    borderColor: [themeSecondary, themePrimary],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const label = context.label || '';
+                                const value = context.raw;
+                                const percentage = Math.round((value / ({{ stats.total_eleves }} || 1)) * 100);
+                                return `${label}: ${value} (${percentage}%)`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Graphique linéaire des moyennes par niveau
+    const moyennesNiveauCtx = document.getElementById('moyennesNiveauChart');
+    if (moyennesNiveauCtx) {
+        // Déboguer les données en console pour voir ce qu'on reçoit
+        console.log('Labels niveaux:', {{ labels_niveaux|tojson|safe }});
+        console.log('Valeurs moyennes:', {{ valeurs_moyennes|tojson|safe }});
+        
+        // Obtenir les données directement de Jinja au lieu d'utiliser getAttribute
+        const labels = {{ labels_niveaux|tojson|safe }};
+        const values = {{ valeurs_moyennes|tojson|safe }};
+
+        // Vérifier si nous avons des données
+        if (labels && labels.length > 0 && values && values.length > 0) {
+            new Chart(moyennesNiveauCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Moyenne générale',
+                        data: values,
+                        backgroundColor: themePrimary + '33', // Add alpha
+                        borderColor: themePrimary,
+                        borderWidth: 2,
+                        pointBackgroundColor: themePrimary,
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: Math.max(0, Math.floor(Math.min(...values) - 1)),
+                            max: Math.min(20, Math.ceil(Math.max(...values) + 1))
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        } else {
+            // Afficher un message si aucune donnée n'est disponible
+            moyennesNiveauCtx.parentNode.innerHTML = '<div class="text-center py-4 text-muted">Aucune donnée disponible pour ce graphique</div>';
+        }
+    }
+
+    // Graphique des retards et absences
+    const absencesRetardsCtx = document.getElementById('absencesRetardsChart');
+    if (absencesRetardsCtx) {
+        const absencesRetardsData = {
+            labels: [{% for ar in absences_retards %}'{{ ar.classe }}',{% endfor %}],
+            datasets: [
+                {
+                    label: 'Retards',
+                    data: [{% for ar in absences_retards %}{{ ar.retards }},{% endfor %}],
+                    backgroundColor: themeWarning + 'CC', // Add alpha
+                    borderColor: themeWarning,
+                    borderWidth: 1
+                },
+                {
+                    label: 'Absences',
+                    data: [{% for ar in absences_retards %}{{ ar.absences }},{% endfor %}],
+                    backgroundColor: themeDanger + 'CC', // Add alpha
+                    borderColor: themeDanger,
+                    borderWidth: 1
+                }
+            ]
+        };
+
+        new Chart(absencesRetardsCtx, {
+            type: 'bar',
+            data: absencesRetardsData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        stacked: false
+                    },
+                    y: {
+                        stacked: false,
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // Cercle de progression pour le taux de réussite
+    const progressBars = document.querySelectorAll('.progress-bar-circle');
+    progressBars.forEach(function(progressBar) {
+        const value = parseFloat(progressBar.getAttribute('data-value')) || 0;
+        const size = progressBar.parentElement.offsetWidth;
+        const thickness = size / 10;
+        const radius = (size - thickness) / 2;
+        const circumference = 2 * Math.PI * radius;
+        const strokeDashoffset = circumference * (1 - value);
+        
+        // Créer le cercle SVG
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', size);
+        svg.setAttribute('height', size);
+        svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+        
+        // Cercle de fond
+        const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        bgCircle.setAttribute('cx', size / 2);
+        bgCircle.setAttribute('cy', size / 2);
+        bgCircle.setAttribute('r', radius);
+        bgCircle.setAttribute('fill', 'none');
+        bgCircle.setAttribute('stroke', '#e9ecef');
+        bgCircle.setAttribute('stroke-width', thickness);
+        
+        // Cercle de progression
+        const progressCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        progressCircle.setAttribute('cx', size / 2);
+        progressCircle.setAttribute('cy', size / 2);
+        progressCircle.setAttribute('r', radius);
+        progressCircle.setAttribute('fill', 'none');
+        progressCircle.setAttribute('stroke', themeWarning);
+        progressCircle.setAttribute('stroke-width', thickness);
+        progressCircle.setAttribute('stroke-dasharray', circumference);
+        progressCircle.setAttribute('stroke-dashoffset', circumference); // Start empty
+        progressCircle.setAttribute('transform', `rotate(-90 ${size / 2} ${size / 2})`);
+        progressCircle.style.transition = 'stroke-dashoffset 0.5s ease';
+        
+        svg.appendChild(bgCircle);
+        svg.appendChild(progressCircle);
+        progressBar.innerHTML = ''; // Clear previous content
+        progressBar.appendChild(svg);
+
+        // Animate the circle
+        setTimeout(() => {
+            progressCircle.setAttribute('stroke-dashoffset', strokeDashoffset);
+        }, 100); // Small delay to ensure transition works
+    });
+
+    // Gestion des événements du formulaire de filtrage
+    const formFiltre = document.querySelector('form');
+    const niveauSelect = document.getElementById('niveau');
+    const classeSelect = document.getElementById('classe');
+    
+    // Lorsque le niveau change, récupérer les classes correspondantes
+    if (niveauSelect && classeSelect) {
+        niveauSelect.addEventListener('change', function() {
+            const niveauId = this.value;
+            
+            // Réinitialiser le select des classes
+            classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+            classeSelect.disabled = true;
+            
+            if (!niveauId) {
+                return; // Si aucun niveau sélectionné, on s'arrête là
+            }
+            
+            // Récupérer les classes du niveau
+            fetch(`/semestre1/api/classes/${niveauId}`)
+                .then(response => response.json())
+                .then(data => {
+                    // Ajouter les classes au select
+                    data.forEach(classe => {
+                        const option = document.createElement('option');
+                        option.value = classe.id;
+                        option.textContent = classe.libelle;
+                        // Restore selection if it matches the filter
+                        if ('{{ filtres.classe_id|string }}' === classe.id.toString()) {
+                            option.selected = true;
+                        }
+                        classeSelect.appendChild(option);
+                    });
+                    
+                    classeSelect.disabled = false;
+                })
+                .catch(error => {
+                    console.error('Erreur lors du chargement des classes:', error);
+                    classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                });
+        });
+        // Trigger change on load if a level is selected to load classes
+        if (niveauSelect.value) {
+            niveauSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // Impression du tableau de bord
+    const btnPrintAnalysis = document.getElementById('btnPrintAnalysis');
+    if (btnPrintAnalysis) {
+        btnPrintAnalysis.addEventListener('click', function() {
+            window.print();
+        });
+    }
+
+    // Export Excel (simulation)
+    const btnExportAnalysis = document.getElementById('btnExportAnalysis');
+    if (btnExportAnalysis) {
+        btnExportAnalysis.addEventListener('click', function() {
+            alert('Fonctionnalité d\'export Excel en cours de développement.');
+        });
+    }
+
+    // Pour le graphique des observations, afficher la légende à droite
+    const obsCanvas = document.getElementById('observationsPieChart');
+    if (obsCanvas && typeof Chart !== 'undefined') {
+        const chartInstance = Chart.getChart(obsCanvas);
+        if (chartInstance) {
+            chartInstance.options.plugins.legend = {
+                display: true,
+                position: 'right',
+                labels: { font: { size: 13 } }
+            };
+            chartInstance.update();
+        }
+    }
+});
 </script>
+
+{% endblock %}
