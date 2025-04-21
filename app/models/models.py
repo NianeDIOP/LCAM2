@@ -113,3 +113,21 @@ class DecisionFinale(db.Model):
     moyenne_annuelle = db.Column(db.Float)
     rang_annuel = db.Column(db.Integer)
     annee_scolaire = db.Column(db.String(20))
+
+class Rapport(db.Model):
+    """Modèle pour stocker les informations sur les rapports générés"""
+    __tablename__ = 'rapports'
+    id = db.Column(db.Integer, primary_key=True)
+    type = db.Column(db.String(50))  # 'moyennes' ou 'discipline'
+    annee_scolaire = db.Column(db.String(50))
+    niveau_id = db.Column(db.Integer, db.ForeignKey('niveau.id'), nullable=True)
+    classe_id = db.Column(db.Integer, db.ForeignKey('classe.id'), nullable=True)
+    format = db.Column(db.String(10), default='pdf')  # 'pdf' ou 'excel'
+    date_creation = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relations
+    niveau = db.relationship('Niveau', backref=db.backref('rapports', lazy='dynamic'))
+    classe = db.relationship('Classe', backref=db.backref('rapports', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<Rapport {self.id} - {self.type}>'

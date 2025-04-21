@@ -1,4 +1,3 @@
-
 from flask import Blueprint, render_template, current_app, request, flash, redirect, url_for
 from app import db
 from app.models.models import Configuration, AnneeScolaire, Niveau, Classe
@@ -31,7 +30,7 @@ def index():
     # Récupérer les sauvegardes disponibles
     backups = []
     backup_dir = os.path.join(os.path.dirname(current_app.root_path), 'backups')
-    if os.path.exists(backup_dir):
+    if (os.path.exists(backup_dir)):
         for filename in os.listdir(backup_dir):
             if filename.endswith('.db'):
                 # Extraire la date du nom de fichier
@@ -501,3 +500,20 @@ def reset_database():
         flash(f'Erreur lors de la réinitialisation: {str(e)}', 'danger')
     
     return redirect(url_for('admin.index'))
+
+@admin_bp.route('/api/configuration')
+def get_configuration():
+    """API pour récupérer les informations de configuration"""
+    config = Configuration.query.first()
+    if not config:
+        config = Configuration()
+        db.session.add(config)
+        db.session.commit()
+    
+    return {
+        'nom_etablissement': config.nom_etablissement,
+        'adresse': config.adresse,
+        'telephone': config.telephone,
+        'inspection_academique': config.inspection_academique,
+        'inspection_education': config.inspection_education,
+    }

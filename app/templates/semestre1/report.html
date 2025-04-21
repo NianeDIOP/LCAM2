@@ -92,9 +92,40 @@
                     <h5 class="card-title mb-0"><i class="fas fa-book me-2"></i>Rapport Moyennes Disciplines</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-custom-muted mb-3">Générer un rapport statistique détaillé pour les disciplines.</p>
-                    <div class="alert alert-secondary">
-                        <i class="fas fa-tools me-2"></i> Cette fonctionnalité sera disponible prochainement.
+                    <p class="text-custom-muted mb-3">Générer un rapport statistique détaillé pour une discipline spécifique.</p>
+                    <form id="disciplineForm" class="mb-3">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="niveauDiscipline" class="form-label">Niveau</label>
+                                <select class="form-select" id="niveauDiscipline" name="niveau_id">
+                                    <option value="">Tous les niveaux</option>
+                                    {% for niveau in niveaux %}
+                                    <option value="{{ niveau.id }}">{{ niveau.libelle }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="classeDiscipline" class="form-label">Classe</label>
+                                <select class="form-select" id="classeDiscipline" name="classe_id" disabled>
+                                    <option value="">Toutes les classes</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label for="discipline" class="form-label">Discipline <span class="text-danger">*</span></label>
+                            <select class="form-select" id="discipline" name="discipline_id" required>
+                                <option value="">Sélectionnez une discipline</option>
+                            </select>
+                            <div class="form-text">La sélection d'une discipline est obligatoire</div>
+                        </div>
+                        <div class="d-grid mt-3">
+                            <button type="button" class="btn btn-success" id="btnGenerateDisciplineReport">
+                                <i class="fas fa-file-export me-1"></i> Générer le rapport
+                            </button>
+                        </div>
+                    </form>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-1"></i> Ce rapport inclut toutes les statistiques pour la discipline sélectionnée : répartition par sexe, mentions, notes, etc.
                     </div>
                 </div>
             </div>
@@ -120,10 +151,28 @@
                     </thead>
                     <tbody id="recentReportsTable">
                         <tr>
-                            <td colspan="5" class="text-center py-3">Aucun rapport récent</td>
+                            <td colspan="5" class="text-center py-3">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">Chargement...</span>
+                                </div>
+                                <span class="ms-2">Chargement des rapports récents...</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center p-3 border-top">
+                <div class="pagination-info">
+                    <span id="paginationInfo">Affichage des rapports 1-5 sur 0</span>
+                </div>
+                <div class="pagination">
+                    <button class="btn btn-sm btn-outline-primary me-1" id="prevPageBtn" disabled>
+                        <i class="fas fa-chevron-left"></i> Précédent
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" id="nextPageBtn" disabled>
+                        Suivant <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -131,8 +180,8 @@
 
 <!-- Modal pour afficher le rapport généré -->
 <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-        <div class="modal-content">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable" style="margin-top: 50px;">
+        <div class="modal-content" style="z-index: 1060;">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title" id="reportModalLabel">Rapport détaillé</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
@@ -153,6 +202,30 @@
                 </button>
                 <button type="button" class="btn btn-success" id="btnPrintReport">
                     <i class="fas fa-print me-2"></i> Imprimer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de confirmation de suppression -->
+<div class="modal fade" id="deleteReportModal" tabindex="-1" aria-labelledby="deleteReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteReportModalLabel">Confirmation de suppression</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+            </div>
+            <div class="modal-body">
+                <p>Êtes-vous sûr de vouloir supprimer ce rapport? Cette action est irréversible.</p>
+                <div class="alert alert-secondary">
+                    <strong>Rapport:</strong> <span id="deleteReportInfo">-</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash-alt me-1"></i> Supprimer
                 </button>
             </div>
         </div>
@@ -185,7 +258,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const btnDownloadReport = document.getElementById('btnDownloadReport');
     const btnPrintReport = document.getElementById('btnPrintReport');
     const reportModal = new bootstrap.Modal(document.getElementById('reportModal'));
+    const deleteReportModal = new bootstrap.Modal(document.getElementById('deleteReportModal'));
     const reportContent = document.getElementById('reportContent');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    
+    // Charger les disciplines au chargement initial de la page
+    loadDisciplines();
+    
+    // Variables pour la pagination
+    let currentPage = 1;
+    let totalReports = 0;
+    let reportsPerPage = 5;
+    let allReports = [];
+    let currentReportToDelete = null;
     
     // Ajouter du CSS pour les symboles mathématiques dans l'affichage HTML
     const styleElement = document.createElement('style');
@@ -693,8 +781,8 @@ document.addEventListener('DOMContentLoaded', function() {
                             </div>
                             <div class="col-md-3 col-sm-6">
                                 <div class="stat-box border rounded text-center">
-                                    <h3 class="display-5">${stats.reussite_count}</h3>
-                                    <p class="mb-0 fw-bold text-success">Élèves <span class="symbol-gte"></span> 10</p>
+                                    <h3 class="display-5">${stats.eleves_moyenne}</h3>
+                                    <p class="mb-0 fw-bold text-success">Élèves sup≥10</p>
                                 </div>
                             </div>
                             <div class="col-md-3 col-sm-6">
@@ -720,7 +808,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <th>Catégorie</th>
                                         <th class="text-center">Total</th>
                                         <th class="text-center">Pourcentage du total</th>
-                                        <th class="text-center">Moyenne <span class="symbol-gte"></span> 10</th>
+                                        <th class="text-center">Moyenne ≥ 10</th>
                                         <th class="text-center">% de réussite interne</th>
                                         <th class="text-center">% du total des réussites</th>
                                     </tr>
@@ -732,7 +820,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td class="text-center">${formatNumber(stats.pct_garcons)}%</td>
                                         <td class="text-center fw-bold">${stats.reussite_garcons}</td>
                                         <td class="text-center">${formatNumber(stats.taux_reussite_garcons)}%</td>
-                                        <td class="text-center">${formatNumber((stats.reussite_garcons / stats.reussite_count) * 100)}%</td>
+                                        <td class="text-center">${formatNumber((stats.reussite_garcons / stats.eleves_moyenne) * 100)}%</td>
                                     </tr>
                                     <tr>
                                         <td><i class="fas fa-female text-danger me-2"></i> Filles</td>
@@ -740,13 +828,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                         <td class="text-center">${formatNumber(stats.pct_filles)}%</td>
                                         <td class="text-center fw-bold">${stats.reussite_filles}</td>
                                         <td class="text-center">${formatNumber(stats.taux_reussite_filles)}%</td>
-                                        <td class="text-center">${formatNumber((stats.reussite_filles / stats.reussite_count) * 100)}%</td>
+                                        <td class="text-center">${formatNumber((stats.reussite_filles / stats.eleves_moyenne) * 100)}%</td>
                                     </tr>
                                     <tr class="table-secondary fw-bold">
                                         <td>Total</td>
                                         <td class="text-center">${stats.total_eleves}</td>
                                         <td class="text-center">100%</td>
-                                        <td class="text-center">${stats.reussite_count}</td>
+                                        <td class="text-center">${stats.eleves_moyenne}</td>
                                         <td class="text-center">${formatNumber(stats.taux_reussite)}%</td>
                                         <td class="text-center">100%</td>
                                     </tr>
@@ -920,7 +1008,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const annee = data.annee_scolaire;
             const filter = data.filter || {};
             const config = data.config || {};
+            
+            // S'assurer que le nom de l'établissement est bien récupéré depuis les données
             const etablissement = config.nom_etablissement || 'Établissement';
+            console.log("Nom de l'établissement dans le PDF:", etablissement);
             const date = new Date().toLocaleDateString('fr-FR');
             
             // En-tête
@@ -935,18 +1026,26 @@ document.addEventListener('DOMContentLoaded', function() {
             doc.setFontSize(10);
             doc.text(`${etablissement} - Année scolaire ${annee} - Semestre 1`, pageWidth / 2, 16, { align: 'center' });
             
-            // Informations de filtrage
+            // Ajout des informations de niveau et classe sous l'en-tête principal
             doc.setTextColor(0, 0, 0);
             doc.setFontSize(12);
-            doc.text(`Niveau: ${filter.niveau || 'Tous'}${filter.classe ? ' | Classe: ' + filter.classe : ''}`, pageWidth / 2, 30, { align: 'center' });
-            
-            // Date de génération
-            doc.setFontSize(9);
-            doc.setTextColor(100, 100, 100);
-            doc.text(`Généré le ${date}`, pageWidth - margin, 38, { align: 'right' });
+            let infoNiveauClasse = "";
+            if (filter.niveau) {
+                infoNiveauClasse += `Niveau: ${filter.niveau}`;
+                if (filter.classe) {
+                    infoNiveauClasse += ` | Classe: ${filter.classe}`;
+                }
+            } else {
+                infoNiveauClasse = "Tous les niveaux et toutes les classes";
+            }
+            doc.text(infoNiveauClasse, pageWidth / 2, 30, { align: 'center' });
+            doc.line(margin, 35, pageWidth - margin, 35); // Ligne de séparation
             
             // 1. Statistiques principales - Table simple
             let currentY = 45;
+            
+            // 1. Statistiques principales - Table simple
+            currentY += 10;
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(13, 71, 161);
             doc.setFontSize(12);
@@ -970,7 +1069,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 { label: 'Effectif total', value: stats.total_eleves },
                 { label: 'Moyenne générale', value: formatNumber(stats.moyenne_generale) + '/20' },
                 { label: 'Médiane', value: formatNumber(stats.mediane) + '/20' },
-                { label: 'Élèves >= 10', value: stats.reussite_count }, // Remplacement de ≥ par >=
+                { label: 'Élèves >= 10', value: stats.eleves_moyenne },
                 { label: 'Taux de réussite', value: formatNumber(stats.taux_reussite) + '%' },
                 { label: 'Note minimale', value: formatNumber(stats.plus_faible_moyenne) + '/20' },
                 { label: 'Note maximale', value: formatNumber(stats.plus_forte_moyenne) + '/20' }
@@ -1020,7 +1119,7 @@ document.addEventListener('DOMContentLoaded', function() {
                   success: stats.reussite_filles, rate: formatNumber(stats.taux_reussite_filles) + '%',
                   moyenne: formatNumber(stats.moyenne_filles) + '/20' },
                 { label: 'Total', count: stats.total_eleves, percent: '100%', 
-                  success: stats.reussite_count, rate: formatNumber(stats.taux_reussite) + '%',
+                  success: stats.eleves_moyenne, rate: formatNumber(stats.taux_reussite) + '%',
                   moyenne: formatNumber(stats.moyenne_generale) + '/20' }
             ];
             
@@ -1174,6 +1273,1417 @@ document.addEventListener('DOMContentLoaded', function() {
     function formatNumber(num) {
         if (isNaN(num)) return '0';
         return parseFloat(num).toFixed(1).replace('.0', '');
+    }
+
+    // Charger les rapports récents au chargement de la page
+    loadRecentReports();
+
+    // Fonction pour charger les rapports récents
+    function loadRecentReports(page = 1) {
+        // Remplacer le contenu par un indicateur de chargement
+        document.getElementById('recentReportsTable').innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Chargement...</span>
+                    </div>
+                    <span class="ms-2">Chargement des rapports récents...</span>
+                </td>
+            </tr>
+        `;
+        
+        fetch('/semestre1/api/reports/recent')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de la récupération des rapports: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Stocker tous les rapports
+                allReports = data;
+                totalReports = data.length;
+                
+                // Mettre à jour la pagination
+                updatePagination();
+                
+                // Afficher la page courante
+                displayRecentReports(page);
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                document.getElementById('recentReportsTable').innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center py-3">
+                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                            Erreur lors du chargement des rapports récents.
+                        </td>
+                    </tr>
+                `;
+                // Désactiver les boutons de pagination
+                prevPageBtn.disabled = true;
+                nextPageBtn.disabled = true;
+                paginationInfo.textContent = "Aucun rapport disponible";
+            });
+    }
+
+    // Fonction pour mettre à jour les contrôles de pagination
+    function updatePagination() {
+        const totalPages = Math.ceil(totalReports / reportsPerPage);
+        const startItem = (currentPage - 1) * reportsPerPage + 1;
+        let endItem = currentPage * reportsPerPage;
+        if (endItem > totalReports) endItem = totalReports;
+        
+        // Mettre à jour le texte d'information
+        paginationInfo.textContent = `Affichage des rapports ${startItem}-${endItem} sur ${totalReports}`;
+        
+        // Activer/désactiver les boutons de navigation
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages || totalPages <= 1;
+    }
+
+    // Gestionnaires d'événements pour les boutons de pagination
+    prevPageBtn.addEventListener('click', function() {
+        if (currentPage > 1) {
+            currentPage--;
+            displayRecentReports(currentPage);
+            updatePagination();
+        }
+    });
+    
+    nextPageBtn.addEventListener('click', function() {
+        const totalPages = Math.ceil(totalReports / reportsPerPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            displayRecentReports(currentPage);
+            updatePagination();
+        }
+    });
+
+    // Fonction pour afficher les rapports récents dans le tableau
+    function displayRecentReports(page = 1) {
+        currentPage = page;
+        const tableBody = document.getElementById('recentReportsTable');
+        
+        if (allReports.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center py-3">Aucun rapport récent</td>
+                </tr>
+            `;
+            return;
+        }
+        
+        // Calculer les indices de début et de fin pour la pagination
+        const startIndex = (page - 1) * reportsPerPage;
+        const endIndex = Math.min(startIndex + reportsPerPage, allReports.length);
+        
+        // Extraire les rapports de la page courante
+        const pageReports = allReports.slice(startIndex, endIndex);
+        
+        let html = '';
+        pageReports.forEach(report => {
+            html += `
+                <tr>
+                    <td>
+                        <span class="badge ${report.type === 'moyennes' ? 'bg-primary' : 'bg-success'}">
+                            ${report.type_display}
+                        </span>
+                    </td>
+                    <td>${report.niveau}</td>
+                    <td>${report.classe}</td>
+                    <td>${report.date}</td>
+                    <td class="text-end">
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-primary view-report-btn" 
+                                data-report-id="${report.id}"
+                                data-report-type="${report.type}"
+                                data-niveau-id="${report.niveau_id || ''}"
+                                data-classe-id="${report.classe_id || ''}"
+                                data-bs-toggle="tooltip"
+                                title="Voir le rapport">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <a href="/semestre1/api/download-report/${report.id}?format=pdf" 
+                           class="btn btn-sm btn-outline-success"
+                           data-bs-toggle="tooltip"
+                           download="rapport_${report.type}_${report.id}.pdf"
+                           title="Télécharger le rapport">
+                            <i class="fas fa-download"></i>
+                        </a>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger delete-report-btn"
+                                data-report-id="${report.id}"
+                                data-report-info="${report.type_display} - ${report.niveau} ${report.classe ? '- ' + report.classe : ''} (${report.date})"
+                                data-bs-toggle="tooltip"
+                                title="Supprimer">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        
+        tableBody.innerHTML = html;
+        
+        // Activer les tooltips Bootstrap
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+        
+        // Ajouter les gestionnaires d'événements pour les boutons de visualisation
+        document.querySelectorAll('.view-report-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const reportId = this.getAttribute('data-report-id');
+                const reportType = this.getAttribute('data-report-type');
+                const niveauId = this.getAttribute('data-niveau-id') || null;
+                const classeId = this.getAttribute('data-classe-id') || null;
+                
+                try {
+                    // Afficher l'indicateur de chargement de la modal avant de générer le rapport
+                    document.getElementById('reportModalLabel').textContent = "Chargement du rapport...";
+                    reportContent.innerHTML = `
+                        <div class="text-center my-5">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Chargement...</span>
+                            </div>
+                            <p class="mt-3 fw-bold">Chargement du rapport en cours...</p>
+                        </div>
+                    `;
+                    reportModal.show();
+                    
+                    // Simuler un clic sur le bouton de génération de rapport
+                    if (reportType === 'moyennes') {
+                        // Si c'est un rapport de moyennes générales, utiliser les mêmes paramètres
+                        // et appeler la même fonction qui génère le rapport initial
+                        if (niveauId) niveauSelect.value = niveauId;
+                        if (classeId && niveauId) {
+                            // Charger les classes du niveau d'abord
+                            fetch(`/semestre1/api/classes/${niveauId}`)
+                                .then(response => {
+                                    if (!response.ok) {
+                                        throw new Error(`Erreur lors de la récupération des classes: ${response.status}`);
+                                    }
+                                    return response.json();
+                                })
+                                .then(data => {
+                                    classeSelect.innerHTML = '<option value="">Toutes les classes</option>';
+                                    data.forEach(classe => {
+                                        const option = document.createElement('option');
+                                        option.value = classe.id;
+                                        option.textContent = classe.libelle;
+                                        classeSelect.appendChild(option);
+                                    });
+                                    classeSelect.disabled = false;
+                                    classeSelect.value = classeId;
+                                    
+                                    // Générer le rapport avec les paramètres chargés
+                                    generateMoyennesGeneralesReport(niveauId, classeId);
+                                })
+                                .catch(error => {
+                                    console.error('Erreur lors du chargement des classes:', error);
+                                    reportContent.innerHTML = `
+                                        <div class="alert alert-danger m-4">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            Erreur lors du chargement des données : ${error.message}
+                                        </div>
+                                    `;
+                                });
+                        } else {
+                            // Si pas de classe spécifique, générer directement
+                            generateMoyennesGeneralesReport(niveauId, null);
+                        }
+                    }
+                    // Ajouter d'autres types de rapports ici plus tard
+                } catch (error) {
+                    console.error('Erreur lors de l\'ouverture du rapport:', error);
+                    reportContent.innerHTML = `
+                        <div class="alert alert-danger m-4">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            Erreur lors de l'ouverture du rapport : ${error.message}
+                        </div>
+                    `;
+                }
+            });
+        });
+        
+        // Ajouter les gestionnaires d'événements pour les boutons de suppression
+        document.querySelectorAll('.delete-report-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const reportId = this.getAttribute('data-report-id');
+                const reportInfo = this.getAttribute('data-report-info');
+                
+                // Mettre à jour le contenu de la modal de confirmation
+                document.getElementById('deleteReportInfo').textContent = reportInfo;
+                
+                // Stocker l'ID du rapport à supprimer
+                currentReportToDelete = reportId;
+                
+                // Afficher la modal de confirmation
+                deleteReportModal.show();
+            });
+        });
+        
+        // Mettre à jour les informations de pagination
+        updatePagination();
+    }
+
+    // Gestionnaire d'événement pour le bouton de confirmation de suppression
+    confirmDeleteBtn.addEventListener('click', function() {
+        if (currentReportToDelete) {
+            // Afficher un indicateur de chargement dans le bouton
+            confirmDeleteBtn.disabled = true;
+            confirmDeleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Suppression...';
+            
+            // Appel à l'API pour supprimer le rapport
+            fetch(`/semestre1/api/delete-report/${currentReportToDelete}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de la suppression: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Fermer la modal
+                    deleteReportModal.hide();
+                    
+                    // Afficher une notification de succès
+                    const notification = document.createElement('div');
+                    notification.classList.add('alert', 'alert-success', 'position-fixed', 'top-0', 'end-0', 'm-3');
+                    notification.innerHTML = '<i class="fas fa-check-circle me-2"></i>Rapport supprimé avec succès.';
+                    notification.style.zIndex = '9999';
+                    document.body.appendChild(notification);
+                    
+                    // Supprimer la notification après quelques secondes
+                    setTimeout(() => {
+                        document.body.removeChild(notification);
+                    }, 3000);
+                    
+                    // Recharger la liste des rapports
+                    loadRecentReports(currentPage);
+                } else {
+                    throw new Error(data.message || 'Erreur lors de la suppression du rapport');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                
+                // Afficher un message d'erreur
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert alert-danger mt-3';
+                alertDiv.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i>Erreur: ${error.message}`;
+                document.querySelector('.modal-body').appendChild(alertDiv);
+            })
+            .finally(() => {
+                // Rétablir le bouton de suppression
+                confirmDeleteBtn.disabled = false;
+                confirmDeleteBtn.innerHTML = '<i class="fas fa-trash-alt me-1"></i> Supprimer';
+            });
+        }
+    });
+
+    // Après avoir généré un rapport, recharger la liste des rapports récents
+    btnGenerateReport.addEventListener('click', function() {
+        // Attendre quelques secondes pour que le rapport soit bien enregistré
+        setTimeout(function() {
+            loadRecentReports();
+            currentPage = 1; // Revenir à la première page après la création d'un nouveau rapport
+        }, 2000);
+    });
+    
+    // Charger les rapports récents au chargement de la page
+    loadRecentReports();
+    
+    // Référence aux éléments du formulaire de disciplines
+    const niveauDisciplineSelect = document.getElementById('niveauDiscipline');
+    const classeDisciplineSelect = document.getElementById('classeDiscipline');
+    const disciplineSelect = document.getElementById('discipline');
+    const btnGenerateDisciplineReport = document.getElementById('btnGenerateDisciplineReport');
+    
+    // Chargement des disciplines depuis l'API
+    function loadDisciplines() {
+        disciplineSelect.disabled = true;
+        disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        fetch('/semestre1/api/disciplines')
+            .then(response => response.json())
+            .then(data => {
+                disciplineSelect.innerHTML = '<option value="">Sélectionnez une discipline</option>';
+                data.forEach(discipline => {
+                    const option = document.createElement('option');
+                    option.value = discipline.id;
+                    option.textContent = discipline.libelle;
+                    disciplineSelect.appendChild(option);
+                });
+                disciplineSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des disciplines:', error);
+                disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                disciplineSelect.disabled = true;
+            });
+    }
+    
+    // Configuration de la dépendance entre niveau et classe pour le formulaire discipline
+    niveauDisciplineSelect.addEventListener('change', function() {
+        const niveauId = this.value;
+        classeDisciplineSelect.disabled = true;
+        classeDisciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        if (!niveauId) {
+            classeDisciplineSelect.innerHTML = '<option value="">Toutes les classes</option>';
+            classeDisciplineSelect.disabled = true;
+            return;
+        }
+        
+        // Appeler l'API pour charger les classes du niveau sélectionné
+        fetch(`/semestre1/api/classes/${niveauId}`)
+            .then(response => response.json())
+            .then(data => {
+                classeDisciplineSelect.innerHTML = '<option value="">Toutes les classes</option>';
+                data.forEach(classe => {
+                    const option = document.createElement('option');
+                    option.value = classe.id;
+                    option.textContent = classe.libelle;
+                    classeDisciplineSelect.appendChild(option);
+                });
+                classeDisciplineSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                classeDisciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                classeDisciplineSelect.disabled = true;
+            });
+    });
+    
+    // Gestionnaire pour le bouton de génération du rapport par discipline
+    btnGenerateDisciplineReport.addEventListener('click', function() {
+        const niveauId = niveauDisciplineSelect.value;
+        const classeId = classeDisciplineSelect.value;
+        const disciplineId = disciplineSelect.value;
+        
+        // Vérifier que la discipline est bien sélectionnée (obligatoire)
+        if (!disciplineId) {
+            // Afficher une alerte
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-warning alert-dismissible fade show mt-3';
+            alertDiv.innerHTML = `
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Veuillez sélectionner une discipline.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+            `;
+            document.querySelector('#disciplineForm .alert')?.remove();
+            document.querySelector('#disciplineForm').appendChild(alertDiv);
+            return;
+        }
+        
+        // Mettre à jour le titre de la modal
+        const disciplineText = disciplineSelect.options[disciplineSelect.selectedIndex].text;
+        let modalTitle = `Rapport Discipline - ${disciplineText}`;
+        if (niveauId) {
+            const niveauText = niveauDisciplineSelect.options[niveauDisciplineSelect.selectedIndex].text;
+            modalTitle += ` - ${niveauText}`;
+            
+            if (classeId) {
+                const classeText = classeDisciplineSelect.options[classeDisciplineSelect.selectedIndex].text;
+                modalTitle += ` - ${classeText}`;
+            }
+        }
+        document.getElementById('reportModalLabel').textContent = modalTitle;
+        
+        // Mise à jour de l'apparence de la modal (couleur verte pour les disciplines)
+        document.querySelector('#reportModal .modal-header').className = 'modal-header bg-success text-white';
+        
+        // Afficher la modal avec un indicateur de chargement
+        reportContent.innerHTML = `
+            <div class="text-center my-5">
+                <div class="spinner-border text-success" role="status">
+                    <span class="visually-hidden">Chargement...</span>
+                </div>
+                <p class="mt-3 fw-bold">Génération du rapport discipline en cours...</p>
+            </div>
+        `;
+        reportModal.show();
+        
+        // Appeler l'API pour récupérer les données du rapport discipline
+        generateDisciplineReport(disciplineId, niveauId, classeId);
+    });
+    
+    // Fonction pour générer le rapport de discipline
+    function generateDisciplineReport(disciplineId, niveauId, classeId) {
+        // Construire l'URL avec les paramètres de filtrage
+        let apiUrl = '/semestre1/api/report/discipline';
+        const params = new URLSearchParams();
+        
+        params.append('discipline_id', disciplineId); // obligatoire
+        if (niveauId) params.append('niveau_id', niveauId);
+        if (classeId) params.append('classe_id', classeId);
+        
+        apiUrl += '?' + params.toString();
+        
+        // Appeler l'API pour récupérer les données
+        fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Erreur lors de la récupération des données : ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Ajouter le nom de l'établissement aux données
+                data.config = data.config || {};
+                data.config.nom_etablissement = etablissementNom;
+                
+                // Afficher le rapport dans la modal
+                displayDisciplineReport(data);
+                
+                // Stocker les données pour le téléchargement ultérieur
+                btnDownloadReport.dataset.reportData = JSON.stringify(data);
+                
+                // Configurer le bouton de téléchargement PDF
+                btnDownloadReport.onclick = function() {
+                    generateDisciplinePDF(data);
+                };
+                
+                // Configurer le bouton d'impression
+                btnPrintReport.onclick = function() {
+                    printDisciplineReport(data);
+                };
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                reportContent.innerHTML = `
+                    <div class="alert alert-danger m-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Erreur lors de la génération du rapport : ${error.message}
+                    </div>
+                `;
+            });
+    }
+    
+    // Fonction pour afficher le rapport de discipline dans la modal
+    function displayDisciplineReport(data) {
+        // Vérifier si des données ont été retournées
+        if (!data || !data.stats) {
+            reportContent.innerHTML = `
+                <div class="alert alert-info m-4">
+                    <i class="fas fa-info-circle me-2"></i>
+                    Aucune donnée disponible pour cette discipline.
+                </div>
+            `;
+            return;
+        }
+        
+        // Formater les statistiques pour l'affichage
+        const stats = data.stats;
+        const annee = data.annee_scolaire;
+        const filter = data.filter || {};
+        const config = data.config || {};
+        
+        // Construction du contenu HTML du rapport avec design amélioré
+        let html = `
+            <div class="report-header p-4 mb-4">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h4 class="etablissement mb-2">${config.nom_etablissement || 'Établissement'}</h4>
+                        <h2 class="mb-1">Rapport Discipline - ${filter.discipline}</h2>
+                        <p class="mb-0">Année scolaire: ${annee} | Semestre 1</p>
+                    </div>
+                    <div class="col-auto text-center">
+                        <span class="badge bg-success text-white fs-6 p-2 shadow-sm">${filter.discipline}</span>
+                        ${filter.niveau ? `<span class="badge bg-light text-dark fs-6 p-2 shadow-sm ms-2">${filter.niveau}</span>` : ''}
+                        ${filter.classe ? `<span class="badge bg-light text-dark fs-6 p-2 shadow-sm ms-2">${filter.classe}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="report-content p-4">
+                <!-- Statistiques générales de la discipline -->
+                <div class="card card-custom mb-4">
+                    <div class="card-header text-white" style="background-color: #2e7d32;">
+                        <h5 class="card-title mb-0"><i class="fas fa-chart-bar me-2"></i>Statistiques générales</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${stats.total_eleves || 0}</h3>
+                                    <p class="mb-0 fw-bold text-primary">Total élèves</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${formatNumber(stats.moyenne_generale || 0)}</h3>
+                                    <p class="mb-0 fw-bold text-info">Moyenne discipline</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${stats.eleves_moyenne || 0}</h3>
+                                    <p class="mb-0 fw-bold text-success">Élèves sup≥10</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 col-sm-6">
+                                <div class="stat-box border rounded text-center">
+                                    <h3 class="display-5">${formatNumber(stats.taux_reussite || 0)}%</h3>
+                                    <p class="mb-0 fw-bold text-warning">Taux de réussite</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Statistiques par sexe -->
+                <div class="card card-custom mb-4">
+                    <div class="card-header text-white" style="background-color: #00796b;">
+                        <h5 class="card-title mb-0"><i class="fas fa-venus-mars me-2"></i>Répartition par sexe</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-custom table-custom-bordered">
+                                <thead>
+                                    <tr class="table-secondary">
+                                        <th>Catégorie</th>
+                                        <th class="text-center">Total</th>
+                                        <th class="text-center">Pourcentage du total</th>
+                                        <th class="text-center">Moyenne ≥ 10</th>
+                                        <th class="text-center">% de réussite interne</th>
+                                        <th class="text-center">Moyenne catégorie</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><i class="fas fa-male text-primary me-2"></i> Garçons</td>
+                                        <td class="text-center fw-bold">${stats.total_garcons || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_garcons || 0)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_garcons || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_garcons || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_garcons || 0)}/20</td>
+                                    </tr>
+                                    <tr>
+                                        <td><i class="fas fa-female text-danger me-2"></i> Filles</td>
+                                        <td class="text-center fw-bold">${stats.total_filles || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_filles || 0)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_filles || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_filles || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_filles || 0)}/20</td>
+                                    </tr>
+                                    <tr class="table-secondary fw-bold">
+                                        <td>Total</td>
+                                        <td class="text-center">${stats.total_eleves || 0}</td>
+                                        <td class="text-center">100%</td>
+                                        <td class="text-center">${stats.eleves_moyenne || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_generale || 0)}/20</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Répartition des notes -->
+                    <div class="col-md-7">
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #00838f;">
+                                <h5 class="card-title mb-0"><i class="fas fa-chart-pie me-2"></i>Répartition des notes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-custom table-custom-bordered">
+                                        <thead>
+                                            <tr class="table-secondary">
+                                                <th>Tranche</th>
+                                                <th class="text-center">Nombre d'élèves</th>
+                                                <th class="text-center">Pourcentage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><span class="badge bg-success badge-custom">Très bien</span> [16-20]</td>
+                                                <td class="text-center fw-bold">${stats.tranches?.tres_bien || 0}</td>
+                                                <td class="text-center">${formatNumber(((stats.tranches?.tres_bien || 0) / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-info badge-custom">Bien</span> [14-16[</td>
+                                                <td class="text-center fw-bold">${stats.tranches?.bien || 0}</td>
+                                                <td class="text-center">${formatNumber(((stats.tranches?.bien || 0) / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-primary badge-custom">Assez bien</span> [12-14[</td>
+                                                <td class="text-center fw-bold">${stats.tranches?.assez_bien || 0}</td>
+                                                <td class="text-center">${formatNumber(((stats.tranches?.assez_bien || 0) / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-warning badge-custom text-dark">Passable</span> [10-12[</td>
+                                                <td class="text-center fw-bold">${stats.tranches?.passable || 0}</td>
+                                                <td class="text-center">${formatNumber(((stats.tranches?.passable || 0) / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                            <tr>
+                                                <td><span class="badge bg-danger badge-custom">Insuffisant</span> [0-10[</td>
+                                                <td class="text-center fw-bold">${stats.tranches?.insuffisant || 0}</td>
+                                                <td class="text-center">${formatNumber(((stats.tranches?.insuffisant || 0) / stats.total_eleves) * 100)}%</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Statistiques avancées -->
+                    <div class="col-md-5">
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #0277bd;">
+                                <h5 class="card-title mb-0"><i class="fas fa-calculator me-2"></i>Statistiques avancées</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.mediane || 0)}</h4>
+                                            <p class="mb-0 text-primary">Médiane</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.ecart_type || 0)}</h4>
+                                            <p class="mb-0 text-primary">Écart-type</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.min || 0)}</h4>
+                                            <p class="mb-0 text-danger">Note minimale</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="stat-box border rounded text-center">
+                                            <h4 class="mb-0 fw-bold">${formatNumber(stats.max || 0)}</h4>
+                                            <p class="mb-0 text-success">Note maximale</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Statistiques comparatives -->
+                        <div class="card card-custom mb-4">
+                            <div class="card-header text-white" style="background-color: #558b2f;">
+                                <h5 class="card-title mb-0"><i class="fas fa-balance-scale me-2"></i>Comparatif moyennes</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-custom table-custom-bordered mb-0">
+                                        <thead>
+                                            <tr class="table-secondary">
+                                                <th>Élément</th>
+                                                <th class="text-center">Valeur</                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td>Moyenne discipline</td>
+                                                <td class="text-center fw-bold">${formatNumber(stats.moyenne_generale || 0)}/20</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Moyenne générale établissement</td>
+                                                <td class="text-center fw-bold">${formatNumber(stats.moyenne_generale_etablissement || 0)}/20</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Différence</td>
+                                                <td class="text-center fw-bold ${parseFloat(stats.difference_moyenne || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                                                    ${parseFloat(stats.difference_moyenne || 0) >= 0 ? '+' : ''}${formatNumber(stats.difference_moyenne || 0)}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pied de page du rapport -->
+                <div class="text-center text-muted mt-4 pt-3 border-top">
+                    <p class="mb-1">Rapport généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</p>
+                    <p class="mb-0">© LCAMS ${new Date().getFullYear()} - Système d'analyse statistique</p>
+                </div>
+            </div>
+        `;
+        
+        // Injecter le HTML dans la modal
+        reportContent.innerHTML = html;
+    }
+    
+    // Fonction pour générer un PDF du rapport discipline
+    function generateDisciplinePDF(data) {
+        const { jsPDF } = window.jspdf;
+        
+        try {
+            // Afficher une notification de chargement
+            const notification = document.createElement('div');
+            notification.classList.add('alert', 'alert-info', 'position-fixed', 'top-0', 'end-0', 'm-3');
+            notification.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Génération du PDF en cours...';
+            notification.style.zIndex = '9999';
+            document.body.appendChild(notification);
+            
+            // Créer un document PDF au format A4 portrait
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Dimensions
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const margin = 10;
+            
+            // Extraction des données
+            const stats = data.stats;
+            const annee = data.annee_scolaire;
+            const filter = data.filter || {};
+            const config = data.config || {};
+            
+            // En-tête
+            doc.setFillColor(46, 125, 50);
+            doc.rect(0, 0, pageWidth, 20, 'F');
+            
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(16);
+            doc.text(`RAPPORT DISCIPLINE - ${filter.discipline}`, pageWidth / 2, 10, { align: 'center' });
+            
+            doc.setFontSize(10);
+            doc.text(`${config.nom_etablissement || 'Établissement'} - Année scolaire ${annee} - Semestre 1`, pageWidth / 2, 16, { align: 'center' });
+            
+            // Informations de filtrage sous l'en-tête principal
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(12);
+            let infoNiveauClasse = "";
+            if (filter.niveau) {
+                infoNiveauClasse += `Niveau: ${filter.niveau}`;
+                if (filter.classe) {
+                    infoNiveauClasse += ` | Classe: ${filter.classe}`;
+                }
+            } else {
+                infoNiveauClasse = "Tous les niveaux et toutes les classes";
+            }
+            doc.text(infoNiveauClasse, pageWidth / 2, 30, { align: 'center' });
+            doc.line(margin, 35, pageWidth - margin, 35); // Ligne de séparation
+            
+            // Statistiques principales
+            let currentY = 45;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(46, 125, 50);
+            doc.setFontSize(12);
+            doc.text('Statistiques principales', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.1);
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text('Statistique', margin + 5, currentY + 10);
+            doc.text('Valeur', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Données principales
+            const statsData = [
+                { label: 'Effectif total', value: stats.total_eleves || 0 },
+                { label: 'Moyenne discipline', value: formatNumber(stats.moyenne_generale || 0) + '/20' },
+                { label: 'Médiane', value: formatNumber(stats.mediane || 0) + '/20' },
+                { label: 'Élèves >= 10', value: stats.eleves_moyenne || 0 },
+                { label: 'Taux de réussite', value: formatNumber(stats.taux_reussite || 0) + '%' },
+                { label: 'Note minimale', value: formatNumber(stats.min || 0) + '/20' },
+                { label: 'Note maximale', value: formatNumber(stats.max || 0) + '/20' }
+            ];
+            
+            currentY += 13;
+            statsData.forEach((row, i) => {
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.setFont('helvetica', 'bold');
+                doc.text(String(row.value), pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // Répartition par sexe
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(46, 125, 50);
+            doc.text('Répartition par sexe', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(9);
+            doc.text('Catégorie', margin + 5, currentY + 10);
+            doc.text('Effectif', margin + 30, currentY + 10, { align: 'center' });
+            doc.text('% du total', margin + 55, currentY + 10, { align: 'center' });
+            doc.text('Moy >= 10', margin + 80, currentY + 10, { align: 'center' });
+            doc.text('% réussite', margin + 105, currentY + 10, { align: 'center' });
+            doc.text('Moyenne', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Données par sexe
+            const genreData = [
+                { label: 'Garçons', count: stats.total_garcons || 0, percent: formatNumber(stats.pct_garcons || 0) + '%', 
+                  success: stats.reussite_garcons || 0, rate: formatNumber(stats.taux_reussite_garcons || 0) + '%', 
+                  moyenne: formatNumber(stats.moyenne_garcons || 0) + '/20' },
+                { label: 'Filles', count: stats.total_filles || 0, percent: formatNumber(stats.pct_filles || 0) + '%', 
+                  success: stats.reussite_filles || 0, rate: formatNumber(stats.taux_reussite_filles || 0) + '%',
+                  moyenne: formatNumber(stats.moyenne_filles || 0) + '/20' },
+                { label: 'Total', count: stats.total_eleves || 0, percent: '100%', 
+                  success: stats.eleves_moyenne || 0, rate: formatNumber(stats.taux_reussite || 0) + '%',
+                  moyenne: formatNumber(stats.moyenne_generale || 0) + '/20' }
+            ];
+            
+            currentY += 13;
+            genreData.forEach((row, i) => {
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                // Mise en gras pour la ligne Total
+                doc.setFont(i === 2 ? 'helvetica' : 'helvetica', i === 2 ? 'bold' : 'normal');
+                
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.text(String(row.count), margin + 30, currentY + 5, { align: 'center' });
+                doc.text(row.percent, margin + 55, currentY + 5, { align: 'center' });
+                doc.text(String(row.success), margin + 80, currentY + 5, { align: 'center' });
+                doc.text(row.rate, margin + 105, currentY + 5, { align: 'center' });
+                doc.text(row.moyenne, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // Répartition des tranches de notes
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(46, 125, 50);
+            doc.text('Répartition des notes', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(10);
+            doc.text('Tranche', margin + 5, currentY + 10);
+            doc.text('Nombre d\'élèves', pageWidth / 2, currentY + 10, { align: 'center' });
+            doc.text('Pourcentage', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Données des tranches
+            const tranchesData = [
+                { label: 'Très bien [16-20]', count: stats.tranches?.tres_bien || 0, 
+                  percent: formatNumber(((stats.tranches?.tres_bien || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Bien [14-16[', count: stats.tranches?.bien || 0, 
+                  percent: formatNumber(((stats.tranches?.bien || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Assez bien [12-14[', count: stats.tranches?.assez_bien || 0, 
+                  percent: formatNumber(((stats.tranches?.assez_bien || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Passable [10-12[', count: stats.tranches?.passable || 0, 
+                  percent: formatNumber(((stats.tranches?.passable || 0) / stats.total_eleves) * 100) + '%' },
+                { label: 'Insuffisant [0-10[', count: stats.tranches?.insuffisant || 0, 
+                  percent: formatNumber(((stats.tranches?.insuffisant || 0) / stats.total_eleves) * 100) + '%' }
+            ];
+            
+            currentY += 13;
+            tranchesData.forEach((row, i) => {
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                doc.text(String(row.count), pageWidth / 2, currentY + 5, { align: 'center' });
+                doc.text(row.percent, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                currentY += 7;
+            });
+            
+            // Comparatif avec la moyenne générale
+            currentY += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(46, 125, 50);
+            doc.text('Comparatif avec la moyenne générale', margin, currentY);
+            
+            // En-tête du tableau
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, currentY + 5, pageWidth - 2 * margin, 8, 'F');
+            
+            doc.setTextColor(0, 0, 0);
+            doc.text('Élément', margin + 5, currentY + 10);
+            doc.text('Valeur', pageWidth - margin - 5, currentY + 10, { align: 'right' });
+            
+            // Données comparatives
+            const comparatifData = [
+                { label: 'Moyenne discipline', value: formatNumber(stats.moyenne_generale || 0) + '/20' },
+                { label: 'Moyenne générale établissement', value: formatNumber(stats.moyenne_generale_etablissement || 0) + '/20' },
+                { label: 'Différence', value: (parseFloat(stats.difference_moyenne || 0) >= 0 ? '+' : '') + formatNumber(stats.difference_moyenne || 0) }
+            ];
+            
+            currentY += 13;
+            comparatifData.forEach((row, i) => {
+                if (i % 2 === 0) {
+                    doc.setFillColor(250, 250, 250);
+                    doc.rect(margin, currentY, pageWidth - 2 * margin, 7, 'F');
+                }
+                
+                doc.setFont('helvetica', 'normal');
+                doc.text(row.label, margin + 5, currentY + 5);
+                
+                // Mettre en couleur la différence
+                if (i === 2) {
+                    if (parseFloat(stats.difference_moyenne || 0) >= 0) {
+                        doc.setTextColor(46, 125, 50); // Vert
+                    } else {
+                        doc.setTextColor(198, 40, 40); // Rouge
+                    }
+                }
+                
+                doc.setFont('helvetica', 'bold');
+                doc.text(row.value, pageWidth - margin - 5, currentY + 5, { align: 'right' });
+                
+                // Réinitialiser la couleur
+                doc.setTextColor(0, 0, 0);
+                
+                currentY += 7;
+            });
+            
+            // Pied de page
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`© LCAMS ${new Date().getFullYear()} - Rapport généré le ${new Date().toLocaleDateString('fr-FR')}`, pageWidth / 2, 285, { align: 'center' });
+            
+            // Téléchargement du PDF
+            let filename = `LCAMS_Rapport_Discipline_${filter.discipline.replace(/\s+/g, '_')}`;
+            if (filter.niveau) filename += `_${filter.niveau.replace(/\s+/g, '_')}`;
+            if (filter.classe) filename += `_${filter.classe.replace(/\s+/g, '_')}`;
+            filename += `_${new Date().toISOString().slice(0, 10)}.pdf`;
+            
+            doc.save(filename);
+            
+            // Supprimer la notification de chargement
+            document.body.removeChild(notification);
+            
+        } catch (error) {
+            console.error('Erreur lors de la génération du PDF discipline:', error);
+            alert('Une erreur est survenue lors de la génération du PDF. Veuillez réessayer.');
+            document.body.querySelector('.alert').remove();
+        }
+    }
+    
+    // Fonction pour l'impression optimisée du rapport discipline
+    function printDisciplineReport(data) {
+        // Récupérer et modifier le contenu pour optimiser l'impression
+        const printWindow = window.open('', '', 'width=900,height=650');
+        printWindow.document.write('<html><head><title>Rapport Discipline LCAMS</title>');
+        
+        // Style optimisé pour l'impression
+        printWindow.document.write(`
+        <style>
+            @page { 
+                size: A4 landscape; 
+                margin: 5mm; 
+            }
+            body { 
+                padding: 0; 
+                margin: 0;
+                font-family: Arial, sans-serif;
+                font-size: 8pt;
+                line-height: 1.1;
+            }
+            .report-header {
+                margin-bottom: 3mm !important;
+                border-bottom: 1px solid #ccc;
+                padding-bottom: 2mm;
+                text-align: center;
+            }
+            .report-header h2 {
+                font-size: 12pt;
+                font-weight: bold;
+                margin: 0 0 1mm 0;
+            }
+            .card-custom { 
+                margin-bottom: 3mm !important;
+                page-break-inside: avoid;
+                border: 1px solid #ddd;
+                border-radius: 2px;
+                box-shadow: none;
+            }
+            .card-header {
+                font-weight: bold;
+                background-color: #f0f0f0;
+                padding: 1mm !important;
+                font-size: 9pt;
+                border-bottom: 1px solid #ccc;
+            }
+            .card-body { 
+                padding: 2mm !important; 
+            }
+            .row {
+                display: flex;
+                flex-wrap: wrap;
+                clear: both;
+                margin-bottom: 2mm;
+            }
+            .col-md-3, .col-md-5, .col-md-6, .col-md-7, .col-auto, .col, .col-sm-6, .col-6 {
+                box-sizing: border-box;
+                float: left;
+                padding: 0 1mm;
+            }
+            .col-md-3, .col-sm-6, .col-6 { width: 25%; }
+            .col-md-5 { width: 41.66%; }
+            .col-md-6 { width: 50%; }
+            .col-md-7 { width: 58.33%; }
+            
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 7pt;
+            }
+            th, td {
+                border: 0.5px solid #ddd;
+                padding: 1mm;
+                text-align: left;
+            }
+            th {
+                background-color: #f0f0f0;
+                font-weight: bold;
+            }
+            
+            .stat-box {
+                text-align: center;
+                border: 1px solid #ddd;
+                padding: 1mm !important;
+                margin-bottom: 1mm;
+                background-color: #f9f9f9;
+                border-radius: 2px;
+            }
+            .display-5 {
+                font-size: 10pt !important;
+                font-weight: bold;
+                margin: 0;
+            }
+            
+            .badge {
+                display: inline-block;
+                padding: 0.5mm 1mm;
+                border-radius: 2px;
+                font-weight: normal;
+                font-size: 7pt;
+                color: white;
+                margin: 0 0.5mm;
+            }
+            .bg-success, .badge-success { background-color: #28a745; }
+            .bg-info, .badge-info { background-color: #17a2b8; }
+            .bg-primary, .badge-primary { background-color: #007bff; }
+            .bg-warning, .badge-warning { background-color: #ffc107; color: black; }
+            .bg-danger, .badge-danger { background-color: #dc3545; }
+            
+            .fw-bold { font-weight: bold; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .text-muted { color: #666; }
+            
+            .print-layout {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+            }
+            .print-header {
+                text-align: center;
+                margin-bottom: 5mm;
+            }
+            .print-stats {
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 5mm;
+            }
+            .print-stats-item {
+                width: 24%;
+            }
+            .print-two-columns {
+                display: flex;
+                justify-content: space-between;
+            }
+            .print-column-left {
+                width: 60%;
+            }
+            .print-column-right {
+                width: 38%;
+            }
+            .print-footer {
+                margin-top: 5mm;
+                text-align: center;
+                font-size: 6pt;
+                color: #666;
+                border-top: 0.5px solid #ddd;
+                padding-top: 1mm;
+            }
+        </style>
+        `);
+        
+        // Extraire les données
+        const stats = data.stats;
+        const annee = data.annee_scolaire;
+        const filter = data.filter || {};
+        const config = data.config || {};
+        
+        // Construction du contenu HTML optimisé pour impression
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(`
+        <div class="print-layout">
+            <!-- En-tête -->
+            <div class="print-header">
+                <h4>${config.nom_etablissement || 'Établissement'}</h4>
+                <h2>Rapport Discipline - ${filter.discipline}</h2>
+                <p>Année scolaire: ${annee} | Semestre 1</p>
+                <p>${filter.niveau || 'Tous niveaux'} ${filter.classe ? '- ' + filter.classe : ''}</p>
+            </div>
+            
+            <!-- Statistiques principales -->
+            <div class="print-stats">
+                <div class="print-stats-item stat-box">
+                    <h3 class="display-5">${stats.total_eleves || 0}</h3>
+                    <p>Total élèves</p>
+                </div>
+                <div class="print-stats-item stat-box">
+                    <h3 class="display-5">${formatNumber(stats.moyenne_generale || 0)}</h3>
+                    <p>Moyenne discipline</p>
+                </div>
+                <div class="print-stats-item stat-box">
+                    <h3 class="display-5">${stats.eleves_moyenne || 0}</h3>
+                    <p>Élèves ≥10</p>
+                </div>
+                <div class="print-stats-item stat-box">
+                    <h3 class="display-5">${formatNumber(stats.taux_reussite || 0)}%</h3>
+                    <p>Taux de réussite</p>
+                </div>
+            </div>
+            
+            <!-- Contenu principal sur 2 colonnes -->
+            <div class="print-two-columns">
+                <!-- Colonne gauche -->
+                <div class="print-column-left">
+                    <!-- Répartition par sexe -->
+                    <div class="card-custom">
+                        <div class="card-header">Répartition par sexe</div>
+                        <div class="card-body p-0">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Catégorie</th>
+                                        <th class="text-center">Total</th>
+                                        <th class="text-center">%</th>
+                                        <th class="text-center">Moy ≥ 10</th>
+                                        <th class="text-center">% réussite</th>
+                                        <th class="text-center">Moyenne</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Garçons</td>
+                                        <td class="text-center fw-bold">${stats.total_garcons || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_garcons || 0)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_garcons || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_garcons || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_garcons || 0)}/20</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Filles</td>
+                                        <td class="text-center fw-bold">${stats.total_filles || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.pct_filles || 0)}%</td>
+                                        <td class="text-center fw-bold">${stats.reussite_filles || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite_filles || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_filles || 0)}/20</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Total</td>
+                                        <td class="text-center fw-bold">${stats.total_eleves || 0}</td>
+                                        <td class="text-center">100%</td>
+                                        <td class="text-center fw-bold">${stats.eleves_moyenne || 0}</td>
+                                        <td class="text-center">${formatNumber(stats.taux_reussite || 0)}%</td>
+                                        <td class="text-center">${formatNumber(stats.moyenne_generale || 0)}/20</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Répartition des notes -->
+                    <div class="card-custom">
+                        <div class="card-header">Répartition des notes</div>
+                        <div class="card-body p-0">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Tranche</th>
+                                        <th class="text-center">Nombre d'élèves</th>
+                                        <th class="text-center">Pourcentage</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Très bien [16-20]</td>
+                                        <td class="text-center fw-bold">${stats.tranches?.tres_bien || 0}</td>
+                                        <td class="text-center">${formatNumber(((stats.tranches?.tres_bien || 0) / stats.total_eleves) * 100)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Bien [14-16[</td>
+                                        <td class="text-center fw-bold">${stats.tranches?.bien || 0}</td>
+                                        <td class="text-center">${formatNumber(((stats.tranches?.bien || 0) / stats.total_eleves) * 100)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Assez bien [12-14[</td>
+                                        <td class="text-center fw-bold">${stats.tranches?.assez_bien || 0}</td>
+                                        <td class="text-center">${formatNumber(((stats.tranches?.assez_bien || 0) / stats.total_eleves) * 100)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Passable [10-12[</td>
+                                        <td class="text-center fw-bold">${stats.tranches?.passable || 0}</td>
+                                        <td class="text-center">${formatNumber(((stats.tranches?.passable || 0) / stats.total_eleves) * 100)}%</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Insuffisant [0-10[</td>
+                                        <td class="text-center fw-bold">${stats.tranches?.insuffisant || 0}</td>
+                                        <td class="text-center">${formatNumber(((stats.tranches?.insuffisant || 0) / stats.total_eleves) * 100)}%</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colonne droite -->
+                <div class="print-column-right">
+                    <!-- Statistiques avancées -->
+                    <div class="card-custom">
+                        <div class="card-header">Statistiques avancées</div>
+                        <div class="card-body">
+                            <div style="display: flex; flex-wrap: wrap; justify-content: space-between;">
+                                <div style="width: 48%; margin-bottom: 2mm;" class="stat-box">
+                                    <h4 class="mb-0 fw-bold">${formatNumber(stats.mediane || 0)}</h4>
+                                    <p>Médiane</p>
+                                </div>
+                                <div style="width: 48%; margin-bottom: 2mm;" class="stat-box">
+                                    <h4 class="mb-0 fw-bold">${formatNumber(stats.ecart_type || 0)}</h4>
+                                    <p>Écart-type</p>
+                                </div>
+                                <div style="width: 48%; margin-bottom: 2mm;" class="stat-box">
+                                    <h4 class="mb-0 fw-bold">${formatNumber(stats.min || 0)}</h4>
+                                    <p>Note minimale</p>
+                                </div>
+                                <div style="width: 48%; margin-bottom: 2mm;" class="stat-box">
+                                    <h4 class="mb-0 fw-bold">${formatNumber(stats.max || 0)}</h4>
+                                    <p>Note maximale</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Comparatif moyennes -->
+                    <div class="card-custom">
+                        <div class="card-header">Comparatif moyennes</div>
+                        <div class="card-body p-0">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Élément</th>
+                                        <th class="text-center">Valeur</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Moyenne discipline</td>
+                                        <td class="text-center fw-bold">${formatNumber(stats.moyenne_generale || 0)}/20</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Moyenne générale établissement</td>
+                                        <td class="text-center fw-bold">${formatNumber(stats.moyenne_generale_etablissement || 0)}/20</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Différence</td>
+                                        <td class="text-center fw-bold ${parseFloat(stats.difference_moyenne || 0) >= 0 ? 'text-success' : 'text-danger'}">
+                                            ${parseFloat(stats.difference_moyenne || 0) >= 0 ? '+' : ''}${formatNumber(stats.difference_moyenne || 0)}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Pied de page -->
+            <div class="print-footer">
+                Rapport généré le ${new Date().toLocaleDateString('fr-FR')} | © LCAMS ${new Date().getFullYear()}
+            </div>
+        </div>
+        `);
+        
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        
+        // Laisser un peu plus de temps au navigateur pour traiter les styles
+        setTimeout(function() {
+            printWindow.print();
+            printWindow.close();
+        }, 500);
+    }
+    
+    // Gestion du changement de niveau pour les disciplines
+    niveauDisciplineSelect.addEventListener('change', function() {
+        // Si un niveau est sélectionné, charger les disciplines de ce niveau
+        const niveauId = this.value;
+        loadDisciplinesByNiveau(niveauId);
+    });
+    
+    // Fonction pour charger les disciplines par niveau
+    function loadDisciplinesByNiveau(niveauId) {
+        disciplineSelect.disabled = true;
+        disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        // Construire l'URL avec ou sans paramètre de niveau
+        let apiUrl = '/semestre1/api/disciplines';
+        if (niveauId) {
+            apiUrl += '?niveau_id=' + niveauId;
+        }
+        
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                disciplineSelect.innerHTML = '<option value="">Sélectionnez une discipline</option>';
+                data.forEach(discipline => {
+                    const option = document.createElement('option');
+                    option.value = discipline.id;
+                    option.textContent = discipline.libelle;
+                    disciplineSelect.appendChild(option);
+                });
+                disciplineSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des disciplines:', error);
+                disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                disciplineSelect.disabled = true;
+            });
     }
 });
 </script>

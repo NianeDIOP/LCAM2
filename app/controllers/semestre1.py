@@ -1,11 +1,14 @@
-from flask import Blueprint, render_template, current_app, jsonify, request, flash, redirect, url_for
-from app.models.models import Niveau, Classe, Eleve, Discipline, NoteS1, MoyenneGeneraleS1, AnneeScolaire, Configuration
+from flask import Blueprint, render_template, current_app, jsonify, request, flash, redirect, url_for, send_file
+from flask_login import login_required
+from app.models.models import Niveau, Classe, Eleve, Discipline, NoteS1, MoyenneGeneraleS1, AnneeScolaire, Configuration, Rapport
 from app import db
 import pandas as pd
 import os
 from werkzeug.utils import secure_filename
 import re
 import datetime
+import time
+import tempfile
 
 semestre1_bp = Blueprint('semestre1', __name__)
 
@@ -1307,79 +1310,562 @@ def discipline_analysis():
     )
 
 @semestre1_bp.route('/api/disciplines')
-def get_all_disciplines():
-    """Récupérer toutes les disciplines existantes pour l'année scolaire active (pour filtre global)"""
+def api_get_disciplines_all():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
     annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
-    disciplines = db.session.query(Discipline).join(NoteS1, NoteS1.discipline_id == Discipline.id)
-    disciplines = disciplines.filter(NoteS1.annee_scolaire == annee_active).distinct().all()
-    return jsonify([{'id': d.id, 'libelle': d.libelle} for d in disciplines])
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
 
 @semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
-def get_disciplines_by_niveau(niveau_id):
-    """Récupérer toutes les disciplines disponibles pour un niveau (toutes classes confondues)"""
-    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
-    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
-    # Trouver toutes les classes du niveau
-    classes = Classe.query.filter_by(niveau_id=niveau_id, etat='actif').all()
-    classe_ids = [c.id for c in classes]
-    # Trouver toutes les disciplines ayant des notes dans ces classes
-    disciplines = db.session.query(Discipline).\
-        join(NoteS1, NoteS1.discipline_id == Discipline.id).\
-        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
-        filter(Eleve.classe_id.in_(classe_ids), NoteS1.annee_scolaire == annee_active).\
-        distinct().all()
-    return jsonify([{'id': d.id, 'libelle': d.libelle} for d in disciplines])
-
-@semestre1_bp.route('/report')
-def report():
-    """Page dédiée aux rapports statistiques"""
-    # Récupérer l'année scolaire active
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
     annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
     
-    # Récupérer les niveaux pour le formulaire de filtrage
-    niveaux = Niveau.query.filter_by(etat='actif').all()
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
     
-    return render_template('semestre1/report.html',
-                          title='Rapports statistiques',
-                          app_name=current_app.config['APP_NAME'],
-                          app_version=current_app.config['APP_VERSION'],
-                          niveaux=niveaux,
-                          annee_scolaire=annee_active)
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
 
-@semestre1_bp.route('/api/report/moyennes-generales')
-def api_report_moyennes_generales():
-    """API pour générer des données de rapport de moyennes générales"""
-    # Récupérer les paramètres de filtrage
-    niveau_id = request.args.get('niveau_id')
-    classe_id = request.args.get('classe_id')
+@semestre1_bp.route('/api/discipline_report/details')
+def api_discipline_report_detailed():
+    """API pour générer un rapport d'analyse par discipline (version détaillée)"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
     
     # Récupérer l'année scolaire active
     annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
     annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
     
     # Construire la requête de base
-    q = db.session.query(MoyenneGeneraleS1).join(Eleve, MoyenneGeneraleS1.eleve_ien == Eleve.ien)
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({'error': 'Aucune donnée pour cette discipline'}), 404
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        if r.classe_id not in class_results:
+            class_results[r.classe_id] = {
+                'classe_id': r.classe_id,
+                'classe_libelle': r.classe_libelle,
+                'niveau_id': r.niveau_id,
+                'niveau_libelle': r.niveau_libelle,
+                'notes': []
+            }
+        class_results[r.classe_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_libelle': data['classe_libelle'],
+            'niveau_id': data['niveau_id'],
+            'niveau_libelle': data['niveau_libelle'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'total_students': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({'error': 'Aucune donnée pour cette discipline'}), 404
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        if r.classe_id not in class_results:
+            class_results[r.classe_id] = {
+                'classe_id': r.classe_id,
+                'classe_libelle': r.classe_libelle,
+                'niveau_id': r.niveau_id,
+                'niveau_libelle': r.niveau_libelle,
+                'notes': []
+            }
+        class_results[r.classe_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_libelle': data['classe_libelle'],
+            'niveau_id': data['niveau_id'],
+            'niveau_libelle': data['niveau_libelle'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'total_students': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify(disciplines_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        return jsonify(disciplines_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        return jsonify(disciplines_data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
     q = q.join(Classe, Eleve.classe_id == Classe.id)
     q = q.join(Niveau, Classe.niveau_id == Niveau.id)
     
     # Appliquer les filtres
-    q = q.filter(MoyenneGeneraleS1.annee_scolaire == annee_active)
-    
-    filter_info = {}
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
     
     if niveau_id:
-        niveau = Niveau.query.get(niveau_id)
-        if niveau:
-            filter_info['niveau'] = niveau.libelle
-            q = q.filter(Niveau.id == niveau_id)
+        q = q.filter(Niveau.id == niveau_id)
     
     if classe_id:
-        classe = Classe.query.get(classe_id)
-        if classe:
-            filter_info['classe'] = classe.libelle
-            q = q.filter(Classe.id == classe_id)
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
     
     # Récupérer les données
     resultats = q.all()
@@ -1387,89 +1873,4529 @@ def api_report_moyennes_generales():
     # Statistiques globales
     total_eleves = len(resultats)
     
-    # Prendre en compte à la fois "M" et "H" pour les élèves masculins
-    q_filles = q.filter(Eleve.sexe == 'F')
-    q_garcons = q.filter(Eleve.sexe.in_(['M', 'H']))
-    
-    total_filles = q_filles.count()
-    total_garcons = q_garcons.count()
-    
-    # Pourcentages
-    pct_filles = round((total_filles / total_eleves * 100) if total_eleves > 0 else 0)
-    pct_garcons = round((total_garcons / total_eleves * 100) if total_eleves > 0 else 0)
-    
-    # Statistiques des moyennes
-    moyennes = [r.moyenne for r in resultats if r.moyenne is not None]
-    moyenne_generale = round(sum(moyennes) / len(moyennes), 2) if moyennes else 0
-    
-    # Calcul des moyennes par sexe
-    moyennes_filles = [r.moyenne for r in q_filles.all() if r.moyenne is not None]
-    moyennes_garcons = [r.moyenne for r in q_garcons.all() if r.moyenne is not None]
-    
-    moyenne_filles = round(sum(moyennes_filles) / len(moyennes_filles), 2) if moyennes_filles else 0
-    moyenne_garcons = round(sum(moyennes_garcons) / len(moyennes_garcons), 2) if moyennes_garcons else 0
-    
-    plus_forte_moyenne = round(max(moyennes), 2) if moyennes else 0
-    plus_faible_moyenne = round(min(moyennes), 2) if moyennes else 0
-    
-    # Ajout médiane et écart-type
-    mediane = round(float(pd.Series(moyennes).median()), 2) if moyennes else 0
-    ecart_type = round(float(pd.Series(moyennes).std()), 2) if moyennes else 0
-    
-    # Élèves avec moyenne >= 10
-    reussite_count = q.filter(MoyenneGeneraleS1.moyenne >= 10).count()
-    reussite_filles = q_filles.filter(MoyenneGeneraleS1.moyenne >= 10).count()
-    reussite_garcons = q_garcons.filter(MoyenneGeneraleS1.moyenne >= 10).count()
-    
-    # Taux de réussite
-    taux_reussite = round((reussite_count / total_eleves * 100) if total_eleves > 0 else 0)
-    taux_reussite_filles = round((reussite_filles / total_filles * 100) if total_filles > 0 else 0)
-    taux_reussite_garcons = round((reussite_garcons / total_garcons * 100) if total_garcons > 0 else 0)
-    
-    # Répartition par mentions
-    felicitations_count = q.filter(MoyenneGeneraleS1.moyenne >= 17).count()
-    encouragements_count = q.filter(MoyenneGeneraleS1.moyenne >= 15, MoyenneGeneraleS1.moyenne < 17).count()
-    tableau_honneur_count = q.filter(MoyenneGeneraleS1.moyenne >= 12, MoyenneGeneraleS1.moyenne < 15).count()
-    passable_count = q.filter(MoyenneGeneraleS1.moyenne >= 10, MoyenneGeneraleS1.moyenne < 12).count()
-    insuffisant_count = q.filter(MoyenneGeneraleS1.moyenne < 10).count()
-    
-    # Observations
-    mieux_faire_count = q.filter(MoyenneGeneraleS1.moyenne >= 10, MoyenneGeneraleS1.moyenne < 12).count()
-    doit_continuer_count = q.filter(MoyenneGeneraleS1.moyenne >= 12).count()
-    risque_redoubler_count = q.filter(MoyenneGeneraleS1.moyenne < 10).count()
-    
-    # Préparer les données pour le rapport
-    data = {
-        'annee_scolaire': annee_active,
-        'filter': filter_info,
-        'stats': {
-            'total_eleves': total_eleves,
-            'total_filles': total_filles,
-            'total_garcons': total_garcons,
-            'pct_filles': pct_filles,
-            'pct_garcons': pct_garcons,
-            'moyenne_generale': moyenne_generale,
-            'moyenne_filles': moyenne_filles,
-            'moyenne_garcons': moyenne_garcons,
-            'plus_forte_moyenne': plus_forte_moyenne,
-            'plus_faible_moyenne': plus_faible_moyenne,
-            'reussite_count': reussite_count,
-            'reussite_filles': reussite_filles,
-            'reussite_garcons': reussite_garcons,
-            'taux_reussite': taux_reussite,
-            'taux_reussite_filles': taux_reussite_filles,
-            'taux_reussite_garcons': taux_reussite_garcons,
-            'felicitations': felicitations_count,
-            'encouragements': encouragements_count,
-            'tableau_honneur': tableau_honneur_count,
-            'passable': passable_count,
-            'insuffisant': insuffisant_count,
-            'mieux_faire': mieux_faire_count,
-            'doit_continuer': doit_continuer_count,
-            'risque_redoubler': risque_redoubler_count,
-            'mediane': mediane,
-            'ecart_type': ecart_type
-        }
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
     }
     
-    return jsonify(data)
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+
+ 
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_all_disciplines():
+    """API pour récupérer toutes les disciplines existantes pour l'année scolaire active (pour filtre global)"""
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    disciplines = db.session.query(Discipline).join(NoteS1, NoteS1.discipline_id == Discipline.id)
+    disciplines = disciplines.filter(NoteS1.annee_scolaire == annee_active).distinct().all()
+    return jsonify([{'id': d.id, 'libelle': d.libelle} for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_data():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_eleves > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>', methods=['GET'])
+def get_disciplines_by_niveau_v2(niveau_id):
+    """API route to get disciplines by niveau"""
+    try:
+        # Get all disciplines for classes in this niveau
+        classes = Classe.query.filter_by(niveau_id=niveau_id).all()
+        classe_ids = [c.id for c in classes]
+        
+        # Find disciplines associated with these classes
+        disciplines = Discipline.query.filter(Discipline.classe_id.in_(classe_ids)).all()
+        
+        disciplines_data = [{'id': d.id, 'libelle': d.libelle} for d in disciplines]
+        return jsonify({'status': 'success', 'disciplines': disciplines_data})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+
+@semestre1_bp.route('/api/stats/discipline')
+def discipline_stats():
+    """API pour récupérer les statistiques d'une discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    sexe = request.args.get('sexe')
+    note_min = request.args.get('note_min', '0')
+    note_max = request.args.get('note_max', '20')
+    
+    # Convertir en float pour les comparaisons
+    try:
+        note_min = float(note_min)
+        note_max = float(note_max)
+    except (ValueError, TypeError):
+        note_min = 0
+        note_max = 20
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Vérifier si la discipline est spécifiée
+    if not discipline_id:
+        return jsonify({'error': 'Une discipline doit être spécifiée'}), 400
+    
+    # Construire la requête de base
+    q = db.session.query(NoteS1).join(Eleve, NoteS1.eleve_ien == Eleve.ien)
+    q = q.join(Classe, Eleve.classe_id == Classe.id)
+    q = q.join(Niveau, Classe.niveau_id == Niveau.id)
+    
+    # Appliquer les filtres
+    q = q.filter(NoteS1.annee_scolaire == annee_active)
+    q = q.filter(NoteS1.discipline_id == discipline_id)
+    
+    if niveau_id:
+        q = q.filter(Niveau.id == niveau_id)
+    
+    if classe_id:
+        q = q.filter(Classe.id == classe_id)
+    
+    if sexe:
+        if sexe == 'M':
+            q = q.filter(Eleve.sexe.in_(['M', 'H']))
+        else:
+            q = q.filter(Eleve.sexe == 'F')
+    
+    q = q.filter(NoteS1.moy_d >= note_min, NoteS1.moy_d <= note_max)
+    
+    # Récupérer les données
+    resultats = q.all()
+    
+    # Statistiques globales
+    total_eleves = len(resultats)
+    
+    # Initialiser les statistiques
+    stats = {
+        'nb_eleves': 0,
+        'moyenne_discipline': 0,
+        'nb_moyenne': 0,
+        'taux_reussite': 0,
+        'min': 0,
+        'max': 0
+    }
+    
+    if total_eleves > 0:
+        # Extraire les moyennes valides
+        moyennes = [r.moy_d for r in resultats if r.moy_d is not None]
+        
+        # Calculer les statistiques
+        stats = {
+            'nb_eleves': total_eleves,
+            'moyenne_discipline': round(sum(moyennes) / len(moyennes), 2) if moyennes else 0,
+            'nb_moyenne': q.filter(NoteS1.moy_d >= 10).count(),
+            'taux_reussite': round((q.filter(NoteS1.moy_d >= 10).count() / total_eleves * 100) if total_eleves > 0 else 0),
+            'min': round(min(moyennes), 2) if moyennes else 0,
+            'max': round(max(moyennes), 2) if moyennes else 0
+        }
+    
+    return jsonify(stats)
+
+@semestre1_bp.route('/report/discipline/<int:rapport_id>/download', methods=['GET'])
+def download_discipline_report(rapport_id):
+    """
+    Télécharger le rapport d'analyse de discipline au format PDF
+    """
+    from app.models.models import Rapport, Discipline, AnneeAcademique, Niveau, Classe
+    import json
+    from flask import render_template, make_response
+    import pdfkit
+    from datetime import datetime
+    import os
+    
+    # Récupérer le rapport
+    rapport = Rapport.query.get_or_404(rapport_id)
+    
+    if rapport.type != 'discipline':
+        return jsonify({'error': 'Type de rapport incorrect'}), 400
+    
+    # Récupérer les données associées
+    discipline = Discipline.query.get(rapport.discipline_id)
+    annee = AnneeAcademique.query.get(rapport.annee_id)
+    niveau = Niveau.query.get(rapport.niveau_id) if rapport.niveau_id else None
+    classe = Classe.query.get(rapport.classe_id) if rapport.classe_id else None
+    
+    # Convertir le contenu JSON en dictionnaire
+    contenu = json.loads(rapport.contenu)
+    
+    # Préparer les données pour le template
+    context = {
+        'titre': f"Rapport d'analyse - {discipline.libelle}",
+        'discipline': discipline.libelle,
+        'annee': annee.libelle,
+        'niveau': niveau.libelle if niveau else "Tous les niveaux",
+        'classe': classe.libelle if classe else "Toutes les classes",
+        'date_creation': rapport.date_creation.strftime('%d/%m/%Y %H:%M'),
+        'statistiques': contenu.get('statistiques', {}),
+        'stats_genre': contenu.get('stats_genre', {}),
+        'stats_reussite': contenu.get('stats_reussite', {}),
+        'tranches': contenu.get('tranches', {}),
+        'tranches_pourcentage': contenu.get('tranches_pourcentage', {})
+    }
+    
+    # Générer le HTML du rapport
+    html = render_template('semestre1/report.html', **context, print_mode=True)
+    
+    # Configurer pdfkit
+    options = {
+        'page-size': 'A4',
+        'encoding': 'UTF-8',
+        'margin-top': '1cm',
+        'margin-right': '1cm',
+        'margin-bottom': '1cm',
+        'margin-left': '1cm',
+        'enable-local-file-access': ''
+    }
+    
+    # Chemin pour enregistrer le PDF temporairement
+    filename = f"discipline_report_{rapport_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.pdf"
+    temp_path = os.path.join('app', 'static', 'uploads', 'reports', filename)
+    
+    # Créer le dossier de destination s'il n'existe pas
+    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+    
+    # Générer le PDF
+    css_path = os.path.join('app', 'static', 'css', 'print.css')
+    pdfkit.from_string(html, temp_path, options=options, css=css_path)
+    
+    # Renvoyer le PDF au client
+    with open(temp_path, 'rb') as f:
+        binary_pdf = f.read()
+    
+    response = make_response(binary_pdf)
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'attachment; filename=rapport_discipline_{discipline.libelle}_{annee.libelle}.pdf'
+    
+    # Supprimer le fichier temporaire après l'avoir envoyé
+    os.remove(temp_path)
+    
+    return response
+
+@semestre1_bp.route('/api/report/discipline', methods=['POST'])
+def api_generate_discipline_report():
+    """
+    API pour générer un rapport de discipline.
+    Paramètres:
+    - discipline_id: ID de la discipline
+    - niveau_id: (optionnel) ID du niveau
+    - classe_id: (optionnel) ID de la classe
+    """
+    discipline_id = request.args.get('discipline_id')
+    niveau_id = request.args.get('niveau_id')
+    classe_id = request.args.get('classe_id')
+    
+    if not discipline_id:
+        return jsonify({'error': 'discipline_id est obligatoire'}), 400
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Construire la requête de base pour les notes
+    query = db.session.query(NoteS1, Eleve).\
+        join(Eleve, NoteS1.eleve_ien == Eleve.ien).\
+        join(Classe, Eleve.classe_id == Classe.id).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active)
+    
+    # Appliquer les filtres
+    if niveau_id:
+        query = query.join(Classe, Eleve.classe_id == Classe.id).\
+                filter(Classe.niveau_id == niveau_id)
+    if classe_id:
+        query = query.filter(Eleve.classe_id == classe_id)
+    
+    # Récupérer les données
+    notes_eleves = query.all()
+    
+    if not notes_eleves:
+        return jsonify({'error': 'Aucune donnée trouvée pour ces critères'}), 404
+    
+    # Calculer les statistiques globales
+    notes = [n.moy_d for n, _ in notes_eleves if n.moy_d is not None]
+    total_eleves = len(notes)
+    
+    if total_eleves == 0:
+        return jsonify({'error': 'Aucune note valide trouvée pour ces critères'}), 404
+    
+    # Statistiques générales
+    moyenne = sum(notes) / total_eleves
+    min_note = min(notes)
+    max_note = max(notes)
+    
+    # Utiliser pandas pour calculer la médiane et l'écart-type
+    notes_series = pd.Series(notes)
+    mediane = float(notes_series.median())
+    ecart_type = float(notes_series.std())
+    
+    # Statistiques par sexe
+    notes_garcons = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe in ('M', 'H')]
+    notes_filles = [n.moy_d for n, e in notes_eleves if n.moy_d is not None and e.sexe == 'F']
+    
+    total_garcons = len(notes_garcons)
+    total_filles = len(notes_filles)
+    
+    moyenne_garcons = sum(notes_garcons) / total_garcons if total_garcons > 0 else 0
+    moyenne_filles = sum(notes_filles) / total_filles if total_filles > 0 else 0
+    
+    reussite_garcons = sum(1 for n in notes_garcons if n >= 10)
+    reussite_filles = sum(1 for n in notes_filles if n >= 10)
+    
+    taux_reussite_global = sum(1 for n in notes if n >= 10) / total_eleves * 100
+    taux_reussite_garcons = reussite_garcons / total_garcons * 100 if total_garcons > 0 else 0
+    taux_reussite_filles = reussite_filles / total_filles * 100 if total_filles > 0 else 0
+    
+    pct_garcons = (total_garcons / total_eleves * 100) if total_eleves > 0 else 0
+    pct_filles = (total_filles / total_eleves * 100) if total_filles > 0 else 0
+    
+    # Répartition par tranches de notes
+    tranches = {
+        'tres_bien': sum(1 for n in notes if n >= 16),
+        'bien': sum(1 for n in notes if 14 <= n < 16),
+        'assez_bien': sum(1 for n in notes if 12 <= n < 14),
+        'passable': sum(1 for n in notes if 10 <= n < 12),
+        'insuffisant': sum(1 for n in notes if n < 10)
+    }
+    
+    # Récupérer la configuration de l'application
+    config = Configuration.query.first()
+    
+    # Récupérer le niveau et la classe si spécifiés
+    niveau = Niveau.query.get(niveau_id) if niveau_id else None
+    classe = Classe.query.get(classe_id) if classe_id else None
+    
+    # Calculer la moyenne générale de l'établissement pour comparaison
+    all_moyennes = db.session.query(NoteS1.moy_d).\
+        filter(NoteS1.discipline_id == discipline_id, 
+               NoteS1.annee_scolaire == annee_active,
+               NoteS1.moy_d.isnot(None)).all()
+    
+    all_moyenne = sum([m.moy_d for m in all_moyennes]) / len(all_moyennes) if all_moyennes else 0
+    difference_moyenne = moyenne - all_moyenne
+    
+    # Préparer les données de retour
+    report_data = {
+        'stats': {
+            'total_eleves': total_eleves,
+            'moyenne_generale': round(moyenne, 2),
+            'eleves_moyenne': sum(1 for n in notes if n >= 10),
+            'taux_reussite': round(taux_reussite_global, 2),
+            'min': round(min_note, 2),
+            'max': round(max_note, 2),
+            'mediane': round(mediane, 2),
+            'ecart_type': round(ecart_type, 2),
+            'total_garcons': total_garcons,
+            'total_filles': total_filles,
+            'pct_garcons': round(pct_garcons, 2),
+            'pct_filles': round(pct_filles, 2),
+            'moyenne_garcons': round(moyenne_garcons, 2),
+            'moyenne_filles': round(moyenne_filles, 2),
+            'reussite_garcons': reussite_garcons,
+            'reussite_filles': reussite_filles,
+            'taux_reussite_garcons': round(taux_reussite_garcons, 2),
+            'taux_reussite_filles': round(taux_reussite_filles, 2),
+            'tranches': tranches,
+            'moyenne_generale_etablissement': round(all_moyenne, 2),
+            'difference_moyenne': round(difference_moyenne, 2)
+        },
+        'config': {
+            'nom_etablissement': config.nom_etablissement if config else 'Établissement'
+        },
+        'filter': {
+            'discipline': discipline.libelle,
+            'niveau': niveau.libelle if niveau else None,
+            'classe': classe.libelle if classe else None
+        },
+        'annee_scolaire': annee_active
+    }
+    
+    # Enregistrer le rapport pour référence ultérieure
+    import json
+    import datetime
+    
+    now = datetime.datetime.now()
+    rapport = Rapport(
+        type='discipline',
+        date_creation=now,
+        contenu=json.dumps(report_data),
+        discipline_id=discipline_id,
+        niveau_id=niveau_id,
+        classe_id=classe_id,
+        annee_scolaire=annee_active
+    )
+    db.session.add(rapport)
+    db.session.commit()
+    
+    # Ajouter l'ID du rapport aux données de retour
+    report_data['rapport_id'] = rapport.id
+    
+    return jsonify(report_data)
+
+@semestre1_bp.route('/api/disciplines')
+def api_get_disciplines():
+    """API pour récupérer toutes les disciplines"""
+    disciplines = Discipline.query.order_by(Discipline.libelle).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/<int:classe_id>')
+def api_get_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines d'une classe spécifique"""
+    # Récupérer la classe pour déterminer le niveau
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à cette classe via l'année en cours
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).filter(
+        Eleve.classe_id == classe_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+
+@semestre1_bp.route('/api/disciplines/niveau/<int:niveau_id>')
+def api_get_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines d'un niveau spécifique"""
+    # Récupérer l'année active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Récupérer les disciplines à partir des notes existantes pour ce niveau
+    disciplines = db.session.query(Discipline).join(
+        NoteS1, NoteS1.discipline_id == Discipline.id
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).filter(
+        Classe.niveau_id == niveau_id,
+        NoteS1.annee_scolaire == annee_active
+    ).distinct().order_by(Discipline.libelle).all()
+    
+    return jsonify([{
+        'id': d.id, 
+        'libelle': d.libelle,
+        'code': d.code
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/discipline_report')
+def api_discipline_report_analysis():
+    """API pour générer un rapport d'analyse par discipline"""
+    # Récupérer les paramètres de la requête
+    discipline_id = request.args.get('discipline_id', type=int)
+    classe_id = request.args.get('classe_id', type=int)
+    niveau_id = request.args.get('niveau_id', type=int)
+    
+    if not discipline_id:
+        return jsonify({'error': 'Discipline non spécifiée'}), 400
+    
+    # Récupérer la discipline
+    discipline = Discipline.query.get_or_404(discipline_id)
+    
+    # Récupérer l'année scolaire active
+    annee_scolaire = AnneeScolaire.query.filter_by(etat='actif').first()
+    annee_active = annee_scolaire.libelle if annee_scolaire else '2024-2025'
+    
+    # Construire la requête de base
+    query = db.session.query(
+        NoteS1.valeur.label('note'),
+        Eleve.sexe,
+        Classe.id.label('classe_id'),
+        Classe.libelle.label('classe_libelle'),
+        Niveau.id.label('niveau_id'),
+        Niveau.libelle.label('niveau_libelle')
+    ).join(
+        Eleve, NoteS1.eleve_ien == Eleve.ien
+    ).join(
+        Classe, Eleve.classe_id == Classe.id
+    ).join(
+        Niveau, Classe.niveau_id == Niveau.id
+    ).filter(
+        NoteS1.discipline_id == discipline_id,
+        NoteS1.annee_scolaire == annee_active
+    )
+    
+    # Filtrer par classe si spécifié
+    if classe_id:
+        query = query.filter(Classe.id == classe_id)
+    
+    # Filtrer par niveau si spécifié
+    if niveau_id:
+        query = query.filter(Niveau.id == niveau_id)
+    
+    # Exécuter la requête
+    results = query.all()
+    
+    if not results:
+        return jsonify({
+            'discipline_id': discipline_id,
+            'discipline_name': discipline.libelle,
+            'niveau_id': niveau_id,
+            'classe_id': classe_id,
+            'results': [],
+            'general_stats': {
+                'average': 0,
+                'highest': 0,
+                'lowest': 0,
+                'total_students': 0
+            },
+            'distribution': [0, 0, 0, 0, 0, 0, 0]  # Distribution vide
+        })
+    
+    # Calculer les statistiques générales
+    all_notes = [r.note for r in results]
+    average = sum(all_notes) / len(all_notes)
+    highest = max(all_notes)
+    lowest = min(all_notes)
+    total_students = len(all_notes)
+    
+    # Calculer la distribution des notes
+    distribution = [0] * 7  # [0-5, 5-10, 10-12, 12-14, 14-16, 16-18, 18-20]
+    for note in all_notes:
+        if note < 5:
+            distribution[0] += 1
+        elif note < 10:
+            distribution[1] += 1
+        elif note < 12:
+            distribution[2] += 1
+        elif note < 14:
+            distribution[3] += 1
+        elif note < 16:
+            distribution[4] += 1
+        elif note < 18:
+            distribution[5] += 1
+        else:
+            distribution[6] += 1
+    
+    # Regrouper les résultats par classe
+    class_results = {}
+    for r in results:
+        class_id = r.classe_id
+        if class_id not in class_results:
+            class_results[class_id] = {
+                'classe_id': class_id,
+                'classe_name': r.classe_libelle,
+                'notes': []
+            }
+        class_results[class_id]['notes'].append(r.note)
+    
+    # Calculer les statistiques par classe
+    class_stats = []
+    for class_id, data in class_results.items():
+        notes = data['notes']
+        class_stats.append({
+            'classe_id': data['classe_id'],
+            'classe_name': data['classe_name'],
+            'average': sum(notes) / len(notes),
+            'highest': max(notes),
+            'lowest': min(notes),
+            'student_count': len(notes)
+        })
+    
+    # Trier les résultats par moyenne décroissante
+    class_stats.sort(key=lambda x: x['average'], reverse=True)
+    
+    # Construire la réponse
+    response = {
+        'discipline_id': discipline_id,
+        'discipline_name': discipline.libelle,
+        'niveau_id': niveau_id,
+        'classe_id': classe_id,
+        'results': class_stats,
+        'general_stats': {
+            'average': average,
+            'highest': highest,
+            'lowest': lowest,
+            'total_students': total_students
+        },
+        'distribution': distribution
+    }
+    
+    return jsonify(response)
+
+@semestre1_bp.route('/api/disciplines_by_niveau/<int:niveau_id>')
+def api_disciplines_by_niveau(niveau_id):
+    """API pour récupérer les disciplines par niveau"""
+    disciplines = Discipline.query.filter_by(niveau_id=niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/api/disciplines_by_classe/<int:classe_id>')
+def api_disciplines_by_classe(classe_id):
+    """API pour récupérer les disciplines par classe"""
+    # Récupérer le niveau associé à la classe
+    classe = Classe.query.get_or_404(classe_id)
+    
+    # Récupérer les disciplines associées à ce niveau
+    disciplines = Discipline.query.filter_by(niveau_id=classe.niveau_id).all()
+    return jsonify([{
+        'id': d.id,
+        'libelle': d.libelle
+    } for d in disciplines])
+
+@semestre1_bp.route('/discipline_analysis')
+@login_required
+def discipline_analysis_admin():
+    """Page for analyzing discipline statistics"""
+    # Get all niveaux for filtering
+    niveaux = Niveau.query.all()
+    
+    # Get all disciplines initially (will be filtered by JS)
+    disciplines = Discipline.query.all()
+    
+    # Get current date for reporting
+    current_date = datetime.datetime.now().strftime("%d/%m/%Y")
+    
+    return render_template(
+        'semestre1/discipline_analysis.html',
+        title='Analyse par Discipline',
+        niveaux=niveaux,
+        disciplines=disciplines,
+        current_date=current_date
+    )

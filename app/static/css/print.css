@@ -1,0 +1,341 @@
+/* 
+ * Styles spécifiques pour l'impression des rapports
+ */
+
+@media print {
+    /* Masquer tous les éléments de la page sauf le rapport */
+    body * {
+        visibility: hidden !important;
+    }
+    
+    /* Afficher uniquement le contenu du rapport */
+    #report-discipline-container,
+    #report-discipline-container * {
+        visibility: visible !important;
+    }
+    
+    /* Positionnement absolu du rapport */
+    #report-discipline-container {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        padding: 20px !important;
+    }
+    
+    /* Assurer que les graphiques sont visibles */
+    canvas {
+        max-width: 100% !important;
+        height: auto !important;
+        visibility: visible !important;
+    }
+    
+    /* Styles pour les cartes */
+    .card {
+        page-break-inside: avoid !important;
+        border: 1px solid #ddd !important;
+        margin-bottom: 15px !important;
+        box-shadow: none !important;
+    }
+    
+    .card-header {
+        background-color: #f0f0f0 !important;
+        color: #000 !important;
+        border-bottom: 1px solid #ddd !important;
+        padding: 8px 15px !important;
+    }
+    
+    /* Styles pour les tableaux */
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+    }
+    
+    th, td {
+        border: 1px solid #ddd !important;
+        padding: 5px 8px !important;
+    }
+    
+    th {
+        background-color: #f5f5f5 !important;
+    }
+    
+    /* Supprimer les éléments inutiles pour l'impression */
+    .print-report-btn, button, .sidebar, nav, footer {
+        display: none !important;
+    }
+    
+    /* Corrections pour l'entête du rapport */
+    .report-header {
+        margin-bottom: 20px !important;
+        text-align: center !important;
+    }
+    
+    .report-header h3 {
+        font-size: 20pt !important;
+        margin-bottom: 5px !important;
+    }
+    
+    .report-header h4 {
+        font-size: 16pt !important;
+        margin-bottom: 5px !important;
+    }
+    
+    /* Forcer les couleurs d'impression */
+    .bg-primary, .bg-success, .bg-info, .bg-warning, .bg-danger {
+        background-color: #fff !important;
+    }
+    
+    .text-white {
+        color: #000 !important;
+    }
+    
+    /* Assurer que les graphiques ont une taille cohérente */
+    #report-notes-chart {
+        height: 300px !important;
+        width: 100% !important;
+        max-width: 500px !important;
+        margin: 0 auto !important;
+    }
+    
+    /* Ajustements pour que tout soit sur une page */
+    .row {
+        display: block !important;
+    }
+    
+    .col-md-6 {
+        width: 100% !important;
+        float: none !important;
+    }
+    
+    /* Assurer que les données du graphique sont visibles */
+    .report-chart-data {
+        display: block !important;
+    }
+}
+
+/* Styles spécifiques pour l'aperçu avant impression */
+#print-preview-container {
+    background-color: white;
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin: 20px auto;
+    max-width: 210mm; /* Largeur A4 */
+    min-height: 297mm; /* Hauteur A4 */
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/**
+ * Styles spécifiques pour l'impression
+ */
+
+/* Règles générales pour l'impression */
+@media print {
+    /* Éléments à masquer lors de l'impression */
+    header, footer, .sidebar, .no-print, 
+    nav, .alert, .btn, input, select, 
+    #filterDisciplineForm, .discipline-header,
+    form, .form-control, .navbar {
+        display: none !important;
+    }
+    
+    /* Afficher le conteneur d'impression */
+    #print-preview-container {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Styles généraux du document */
+    body {
+        font-family: Arial, sans-serif;
+        font-size: 12pt;
+        line-height: 1.4;
+        background: #fff;
+        color: #000;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Conteneur principal */
+    .print-report {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        background: white;
+    }
+    
+    /* En-tête du rapport */
+    .report-header {
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .report-header h3 {
+        font-size: 18pt;
+        margin-bottom: 5px;
+    }
+    
+    .report-header h4 {
+        font-size: 16pt;
+        margin-bottom: 5px;
+    }
+    
+    .report-header p {
+        font-size: 12pt;
+        color: #444;
+    }
+    
+    /* Rangées et colonnes */
+    .row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: 0 -15px;
+        page-break-inside: avoid;
+    }
+    
+    .col-md-6 {
+        width: 50%;
+        padding: 0 15px;
+        box-sizing: border-box;
+    }
+    
+    /* Cartes */
+    .card {
+        border: 1px solid #ddd;
+        margin-bottom: 20px;
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+    
+    .card-header {
+        background-color: #f5f5f5 !important;
+        padding: 10px 15px;
+        font-weight: bold;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .card-header.bg-primary {
+        background-color: #2196F3 !important;
+        color: #fff !important;
+    }
+    
+    .card-header.bg-success {
+        background-color: #4CAF50 !important;
+        color: #fff !important;
+    }
+    
+    .card-header.bg-info {
+        background-color: #00BCD4 !important;
+        color: #fff !important;
+    }
+    
+    .card-header.bg-warning {
+        background-color: #FFC107 !important;
+        color: #000 !important;
+    }
+    
+    .card-body {
+        padding: 15px;
+    }
+    
+    /* Tableaux */
+    .table {
+        width: 100%;
+        max-width: 100%;
+        margin-bottom: 1rem;
+        border-collapse: collapse;
+    }
+    
+    .table-sm td, .table-sm th {
+        padding: 5px;
+    }
+    
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(0,0,0,.05);
+    }
+    
+    .table th {
+        text-align: left;
+        font-weight: bold;
+    }
+    
+    /* Textes et couleurs */
+    .text-success {
+        color: #4CAF50 !important;
+    }
+    
+    .text-danger {
+        color: #F44336 !important;
+    }
+    
+    .text-info {
+        color: #00BCD4 !important;
+    }
+    
+    .text-warning {
+        color: #FFC107 !important;
+    }
+    
+    .text-muted {
+        color: #6c757d !important;
+    }
+    
+    /* Graphiques */
+    canvas {
+        max-height: 300px !important;
+        max-width: 100% !important;
+    }
+    
+    /* Données des graphiques */
+    .report-chart-data {
+        display: block !important;
+    }
+    
+    /* Boutons spécifiques à l'impression */
+    .print-report-btn {
+        display: none !important;
+    }
+    
+    /* Éviter les sauts de page inconvenants */
+    h3, h4, h5, h6, tr, img {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    /* Forcer les sauts de page quand nécessaire */
+    .page-break-after {
+        page-break-after: always;
+        break-after: page;
+    }
+    
+    /* Ajustement pour les pages d'analyse */
+    #disciplineDashboard {
+        display: none !important;
+    }
+}
+
+/* Styles pour le conteneur d'aperçu */
+#print-preview-container {
+    display: none;
+    background-color: white;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Styles pour le rapport */
+.print-report {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Pour les éléments qui ne doivent apparaître que lors de l'impression */
+.print-only {
+    display: none;
+}
+@media print {
+    .print-only {
+        display: block;
+    }
+}

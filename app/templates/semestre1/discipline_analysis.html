@@ -3,6 +3,11 @@
 
 {% set title = 'Semestre 1' %}
 
+{% block head %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}">
+{% endblock %}
+
 {% block sidebar_content %}
     <a href="{{ url_for('semestre1.index') }}#tab-overview" class="list-group-item{% if request.endpoint == 'semestre1.index' and (not request.args.get('tab') or request.args.get('tab') == 'overview') %} active{% endif %}">
         <i class="fas fa-chart-pie me-2"></i> Vue d'ensemble
@@ -58,8 +63,11 @@
         </div>
         <div class="col-md-3">
             <label for="discipline" class="form-label">Discipline</label>
-            <select class="form-select form-select-sm" id="discipline" name="discipline_id" disabled>
+            <select class="form-select form-select-sm" id="discipline" name="discipline_id" {% if not disciplines %}disabled{% endif %}>
                 <option value="">Toutes disciplines</option>
+                {% for discipline in disciplines %}
+                <option value="{{ discipline.id }}" {% if filtres.discipline_id|string == discipline.id|string %}selected{% endif %}>{{ discipline.libelle }}</option>
+                {% endfor %}
             </select>
         </div>
         <div class="col-md-1">
@@ -78,8 +86,8 @@
             <label for="note_max" class="form-label">Note max</label>
             <input type="number" step="0.1" min="0" max="20" class="form-control form-control-sm" id="note_max" name="note_max" value="{{ filtres.note_max|default('') }}">
         </div>
-        <div class="col-md-2 d-grid align-items-end">
-            <button type="submit" class="btn btn-success btn-sm w-100" style="height:38px;">
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-success w-100" id="btnFilter">
                 <i class="fas fa-search me-1"></i>Filtrer
             </button>
         </div>
@@ -238,6 +246,13 @@
     {% endif %}
 </div>
 
+<!-- Conteneur pour l'aperçu d'impression -->
+<div id="print-preview-container" style="display: none;">
+    <div id="report-discipline-container" class="print-report">
+        <!-- Le contenu du rapport sera injecté ici par JavaScript -->
+    </div>
+</div>
+
 <style>
 .theme-discipline main {
     background: #f6fff7;
@@ -275,6 +290,16 @@
 .card .fs-4 {
     font-size: 1.5rem !important;
 }
+
+/* Styles spécifiques pour l'impression */
+@media print {
+    #disciplineDashboard, header, footer, .sidebar, nav {
+        display: none !important;
+    }
+    #print-preview-container {
+        display: block !important;
+    }
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -287,61 +312,74 @@ document.addEventListener('DOMContentLoaded', function() {
     function loadDisciplines(niveauId, classeId, selectedDisciplineId) {
         disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
         disciplineSelect.disabled = true;
-        let url = '';
-        if (classeId) {
-            url = `/semestre1/api/disciplines/${classeId}`;
-        } else if (niveauId) {
-            url = `/semestre1/api/disciplines/niveau/${niveauId}`;
-        } else {
-            disciplineSelect.innerHTML = '<option value="">Sélectionnez un niveau ou une classe</option>';
-            disciplineSelect.disabled = true;
-            return;
-        }
-        fetch(url)
-            .then(r => r.json())
-            .then(data => {
-                disciplineSelect.innerHTML = '<option value="">Toutes disciplines</option>';
-                data.forEach(d => {
-                    const option = document.createElement('option');
-                    option.value = d.id;
-                    option.textContent = d.libelle;
-                    if (selectedDisciplineId && String(selectedDisciplineId) === String(d.id)) option.selected = true;
-                    disciplineSelect.appendChild(option);
+        
+        // Modification majeure - Charger les disciplines en fonction du niveau, pas de la classe
+        if (niveauId) {
+            const url = `/semestre1/api/disciplines/niveau/${niveauId}`;
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    disciplineSelect.innerHTML = '<option value="">Toutes disciplines</option>';
+                    data.forEach(d => {
+                        const option = document.createElement('option');
+                        option.value = d.id;
+                        option.textContent = d.libelle;
+                        if (selectedDisciplineId && String(selectedDisciplineId) === String(d.id)) option.selected = true;
+                        disciplineSelect.appendChild(option);
+                    });
+                    disciplineSelect.disabled = false;
                 });
-                disciplineSelect.disabled = false;
-            });
+        } else {
+            disciplineSelect.innerHTML = '<option value="">Sélectionnez un niveau</option>';
+            disciplineSelect.disabled = true;
+        }
     }
 
     // Initial load
     const initialNiveau = niveauSelect.value;
     const initialClasse = classeSelect.value;
     const initialDiscipline = "{{ filtres.discipline_id|string }}";
-    loadDisciplines(initialNiveau, initialClasse, initialDiscipline);
+    
+    // Si un niveau est déjà sélectionné, charger les disciplines
+    if (initialNiveau) {
+        loadDisciplines(initialNiveau, initialClasse, initialDiscipline);
+    }
 
     niveauSelect.addEventListener('change', function() {
         const niveauId = this.value;
         classeSelect.innerHTML = '<option value="">Chargement...</option>';
         classeSelect.disabled = true;
-        fetch(`/semestre1/api/classes/${niveauId}`)
-            .then(r => r.json())
-            .then(data => {
-                classeSelect.innerHTML = '<option value="">Toutes classes</option>';
-                data.forEach(classe => {
-                    const option = document.createElement('option');
-                    option.value = classe.id;
-                    option.textContent = classe.libelle;
-                    classeSelect.appendChild(option);
+        
+        if (niveauId) {
+            fetch(`/semestre1/api/classes/${niveauId}`)
+                .then(r => r.json())
+                .then(data => {
+                    classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+                    data.forEach(classe => {
+                        const option = document.createElement('option');
+                        option.value = classe.id;
+                        option.textContent = classe.libelle;
+                        classeSelect.appendChild(option);
+                    });
+                    classeSelect.disabled = false;
+                    
+                    // Charger les disciplines pour le niveau sélectionné
+                    loadDisciplines(niveauId, '', '');
                 });
-                classeSelect.disabled = false;
-                // Charger les disciplines pour le niveau (pas de classe sélectionnée)
-                loadDisciplines(niveauId, '', '');
-            });
+        } else {
+            // Réinitialiser la liste des classes et des disciplines si aucun niveau n'est sélectionné
+            classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+            classeSelect.disabled = true;
+            disciplineSelect.innerHTML = '<option value="">Sélectionnez un niveau</option>';
+            disciplineSelect.disabled = true;
+        }
     });
+    
+    // La classe peut encore être changée pour filtrer les résultats, mais cela ne change plus les disciplines disponibles
     classeSelect.addEventListener('change', function() {
-        const niveauId = niveauSelect.value;
-        const classeId = this.value;
-        loadDisciplines(niveauId, classeId, '');
+        // Ne plus charger les disciplines en fonction de la classe
     });
+    
     // Charts dynamiques
     {% if stats %}
     const notesChart = document.getElementById('disciplineNotesChart');
@@ -387,4 +425,88 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endif %}
 });
 </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Référence aux éléments de formulaire
+    const niveauSelect = document.getElementById('niveau');
+    const classeSelect = document.getElementById('classe');
+    const disciplineSelect = document.getElementById('discipline');
+    
+    // Charger les disciplines initialement
+    loadDisciplinesByNiveau(niveauSelect.value);
+    
+    // Gestionnaire d'événement pour le changement de niveau
+    niveauSelect.addEventListener('change', function() {
+        const niveauId = this.value;
+        
+        // Chargement des classes pour le niveau sélectionné
+        classeSelect.disabled = true;
+        classeSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        // Chargement des disciplines basé sur le niveau (et non la classe)
+        loadDisciplinesByNiveau(niveauId);
+        
+        if (!niveauId) {
+            classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+            classeSelect.disabled = true;
+            return;
+        }
+        
+        fetch(`/semestre1/api/classes/${niveauId}`)
+            .then(response => response.json())
+            .then(data => {
+                classeSelect.innerHTML = '<option value="">Toutes classes</option>';
+                data.forEach(classe => {
+                    const option = document.createElement('option');
+                    option.value = classe.id;
+                    option.textContent = classe.libelle;
+                    classeSelect.appendChild(option);
+                });
+                classeSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                classeSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                classeSelect.disabled = true;
+            });
+    });
+    
+    // Fonction pour charger les disciplines en fonction du niveau sélectionné
+    function loadDisciplinesByNiveau(niveauId) {
+        disciplineSelect.disabled = true;
+        disciplineSelect.innerHTML = '<option value="">Chargement...</option>';
+        
+        // Construire l'URL avec ou sans paramètre de niveau
+        let apiUrl = '/semestre1/api/disciplines';
+        if (niveauId) {
+            apiUrl += '?niveau_id=' + niveauId;
+        }
+        
+        fetch(apiUrl)
+            .then(response => response.json())
+            .then(data => {
+                disciplineSelect.innerHTML = '<option value="">Toutes disciplines</option>';
+                data.forEach(discipline => {
+                    const option = document.createElement('option');
+                    option.value = discipline.id;
+                    option.textContent = discipline.libelle;
+                    disciplineSelect.appendChild(option);
+                });
+                disciplineSelect.disabled = false;
+            })
+            .catch(error => {
+                console.error('Erreur lors du chargement des disciplines:', error);
+                disciplineSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                disciplineSelect.disabled = true;
+            });
+    }
+    
+    // La classe est maintenant un filtre secondaire, sans impact sur le chargement des disciplines
+    classeSelect.addEventListener('change', function() {
+        // Pas besoin de recharger les disciplines quand on change de classe
+    });
+});
+</script>
+
 {% endblock %}
